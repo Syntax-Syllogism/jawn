@@ -1,0 +1,20 @@
+[
+  {
+    "alias": [],
+    "command": "jawn:user:provision",
+    "flagAliases": [],
+    "flagChars": ["o"],
+    "flags": [
+      "api-version",
+      "dry-run",
+      "external-id",
+      "flags-dir",
+      "json",
+      "no-prompt",
+      "personas-def",
+      "target-org",
+      "users-def"
+    ],
+    "plugin": "@syntax-syllogism/jawn"
+  }
+]
