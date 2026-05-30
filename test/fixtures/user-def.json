@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "username": "jdoe@email.com.mySalesforceOrg",
+      "persona": "admin",
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "jdoe@email.com"
+    },
+    {
+      "FederationIdentifier": "ABCD1234",
+      "persona": "default",
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jsmith@email.com"
+    },
+    {
+      "FederationIdentifier": "ABCD1235",
+      "persona": "default"
+    }
+  ]
+}

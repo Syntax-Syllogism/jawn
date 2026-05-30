@@ -83,8 +83,8 @@ describe('jawn user provision command', () => {
     sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
       flags: {
         'target-org': { getConnection: () => fakeConn },
-        'users-def': 'notes/user-def.json',
-        'personas-def': 'notes/persona-def.json',
+        'users-def': 'test/fixtures/user-def.json',
+        'personas-def': 'test/fixtures/persona-def.json',
         'external-id': undefined,
         'no-prompt': true,
         'dry-run': true,
@@ -112,8 +112,8 @@ describe('jawn user provision command', () => {
     sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
       flags: {
         'target-org': { getConnection: () => fakeConn },
-        'users-def': 'notes/user-def.json',
-        'personas-def': 'notes/persona-def.json',
+        'users-def': 'test/fixtures/user-def.json',
+        'personas-def': 'test/fixtures/persona-def.json',
         'external-id': undefined,
         'no-prompt': false,
         'dry-run': true,
@@ -224,8 +224,8 @@ describe('jawn user provision command', () => {
     sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
       flags: {
         'target-org': { getConnection: () => fakeConn },
-        'users-def': 'notes/user-def.json',
-        'personas-def': 'notes/persona-def.json',
+        'users-def': 'test/fixtures/user-def.json',
+        'personas-def': 'test/fixtures/persona-def.json',
         'external-id': undefined,
         'no-prompt': true,
         'dry-run': true,
