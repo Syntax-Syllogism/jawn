@@ -129,6 +129,37 @@ describe('jawn user provision command', () => {
     expect(sfCommandStubs.warn.called).to.equal(true);
   });
 
+  it('does not prompt in json mode when warnings exist', async () => {
+    const fakeConn = createFakeConnection();
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [] };
+      if (soql.includes('FROM UserRole')) return { records: [] };
+      if (soql.includes('FROM PermissionSet')) return { records: [] };
+      if (soql.includes('FROM PermissionSetGroup')) return { records: [] };
+      if (soql.includes("FROM Group WHERE DeveloperName IN ('admin') AND Type = 'Regular'")) return { records: [] };
+      if (soql.includes("FROM Group WHERE DeveloperName IN ('admin') AND Type = 'Queue'")) return { records: [] };
+      return { records: [] };
+    });
+
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': 'test/fixtures/user-def.json',
+        'personas-def': 'test/fixtures/persona-def.json',
+        'external-id': undefined,
+        'no-prompt': false,
+        'dry-run': true,
+        'api-version': undefined,
+      },
+    } as never);
+    const confirmStub = sinon
+      .stub(UserProvision.prototype as unknown as { confirm: () => Promise<boolean> }, 'confirm')
+      .resolves(true);
+
+    await UserProvision.run(['--json']);
+    expect(confirmStub.called).to.equal(false);
+  });
+
   it('uses bulk create/update arrays for user saves', async () => {
     const fakeConn = createFakeConnection();
     const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
@@ -467,5 +498,70 @@ describe('jawn user provision command', () => {
     const result = await UserProvision.run(['--json']);
     expect(result.users[0].status).to.equal('failed');
     expect(result.users[0].errors.join(' ')).to.include('not updateable');
+  });
+
+  it('reports cross-reference candidate fields for update failures', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-xref.json');
+    const personasPath = join(dir, 'personas-xref.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            FederationIdentifier: 'A002',
+            persona: 'default',
+            LastName: 'User',
+            Alias: 'euser',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(
+      personasPath,
+      JSON.stringify({
+        personas: {
+          default: { profile: 'Admin', role: 'CEO' },
+        },
+      })
+    );
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserRole'))
+        return { records: [{ Id: '00Exx0000000001AAA', Name: 'CEO', DeveloperName: 'CEO' }] };
+      if (soql.includes('SELECT Id, IsActive, FederationIdentifier FROM User'))
+        return { records: [{ Id: '005xx0000000002AAA', IsActive: true, FederationIdentifier: 'A002' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    fakeConn.sobjectMap.User.update.resolves([
+      {
+        success: false,
+        errors: [{ message: 'invalid cross reference id', statusCode: 'INVALID_CROSS_REFERENCE_KEY', fields: [] }],
+      },
+    ]);
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': 'FederationIdentifier',
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].errors.join(' ')).to.include('Cross-reference update candidates for this user:');
+    expect(result.users[0].errors.join(' ')).to.include('ProfileId=');
+    expect(result.users[0].errors.join(' ')).to.include('UserRoleId=');
   });
 });

@@ -78,6 +78,10 @@ Missing required fields for insert: %s.
 
 Save operation returned no user id.
 
+# errorCrossReferenceCandidates
+
+Cross-reference update candidates for this user: %s
+
 # info.summary
 
 Processed %s users: %s created, %s updated, %s failed.

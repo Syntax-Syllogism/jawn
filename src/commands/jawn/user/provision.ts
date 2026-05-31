@@ -18,7 +18,8 @@ Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
 const messages = Messages.loadMessages('@syntax-syllogism/jawn', 'jawn.user.provision');
 
 type JsonRecord = Record<string, unknown>;
-type SaveResult = { success: boolean; id?: string; errors: Array<{ message: string }> };
+type SaveError = { message: string; statusCode?: string; fields?: string[] };
+type SaveResult = { success: boolean; id?: string; errors: SaveError[] };
 type ExistingUser = { Id: string; IsActive?: boolean; matchKey: string };
 type ExistingAssignment = { Id: string; PermissionSetId?: string; PermissionSetGroupId?: string };
 type ExistingMembership = { Id: string; GroupId: string; GroupType?: string };
@@ -84,9 +85,25 @@ const readJsonOrThrow = async (path: string): Promise<unknown> => {
   }
 };
 
+const formatSaveError = (error: SaveError): string => {
+  const fieldSuffix = error.fields && error.fields.length > 0 ? ` (fields: ${error.fields.join(', ')})` : '';
+  return error.statusCode ? `${error.statusCode}: ${error.message}${fieldSuffix}` : error.message;
+};
+
+const appendCrossReferenceCandidates = (errors: string[], target: JsonRecord): string[] => {
+  const hasCrossRefError = errors.some((e) => e.includes('INVALID_CROSS_REFERENCE_KEY'));
+  if (!hasCrossRefError) return errors;
+  const candidateFields = Object.entries(target)
+    .filter(([field]) => field.endsWith('Id') && field !== 'Id')
+    .map(([field, value]) => `${field}=${String(value)}`);
+  if (candidateFields.length === 0) return errors;
+  return errors.concat(messages.getMessage('errorCrossReferenceCandidates', [candidateFields.join(', ')]));
+};
+
 const pushErrors = (errors: string[], saveResults: SaveResult | SaveResult[] | undefined): void => {
   if (!saveResults) return;
-  for (const result of asArray(saveResults)) if (!result.success) errors.push(...result.errors.map((e) => e.message));
+  for (const result of asArray(saveResults))
+    if (!result.success) errors.push(...result.errors.map((e) => formatSaveError(e)));
 };
 
 const collectPersonaRefs = (personas: Record<string, PersonaDefinition>): Record<string, Set<string>> => {
@@ -496,7 +513,7 @@ const executeBulkUserSaves = async (conn: Connection, plans: UserPlan[]): Promis
         plan,
         success: createResults[idx]?.success === true && Boolean(createResults[idx]?.id),
         id: createResults[idx]?.id,
-        errors: (createResults[idx]?.errors ?? []).map((e) => e.message),
+        errors: (createResults[idx]?.errors ?? []).map((e) => formatSaveError(e)),
       }))
     );
   }
@@ -513,7 +530,7 @@ const executeBulkUserSaves = async (conn: Connection, plans: UserPlan[]): Promis
         plan,
         success: updateResults[idx]?.success === true && Boolean(updateResults[idx]?.id),
         id: updateResults[idx]?.id ?? plan.existing.Id,
-        errors: (updateResults[idx]?.errors ?? []).map((e) => e.message),
+        errors: (updateResults[idx]?.errors ?? []).map((e) => formatSaveError(e)),
       }))
     );
   }
@@ -570,7 +587,10 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
       resolveReferences(conn, personas),
       getExistingUsers(conn, users, externalIdField),
     ]);
-    if (refs.warnings.length > 0 && !flags['no-prompt']) await this.confirmWarnings();
+    if (!this.jsonEnabled()) {
+      for (const warning of refs.warnings) this.warn(warning);
+      if (refs.warnings.length > 0 && !flags['no-prompt']) await this.confirmWarnings();
+    }
 
     const plans: UserPlan[] = users.map((user, idx) => {
       const persona = personas[user.persona];
@@ -703,15 +723,18 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           const outcomes = await executeBulkUserSaves(conn, plans);
           const saveFailures = outcomes
             .filter((o) => !o.success)
-            .map((o) => ({
-              planId: o.plan.planId,
-              order: o.plan.order,
-              key: o.plan.key,
-              persona: o.plan.persona,
-              status: 'failed' as const,
-              actions: o.plan.actions,
-              errors: o.errors,
-            }));
+            .map((o) => {
+              const errors = appendCrossReferenceCandidates(o.errors, o.plan.target);
+              return {
+                planId: o.plan.planId,
+                order: o.plan.order,
+                key: o.plan.key,
+                persona: o.plan.persona,
+                status: 'failed' as const,
+                actions: o.plan.actions,
+                errors,
+              };
+            });
           const postSaveResults = await runBatches(
             outcomes.filter((o) => o.success),
             USER_PROCESS_CONCURRENCY,
@@ -740,7 +763,6 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           output.summary.failed,
         ])
       );
-      for (const warning of refs.warnings) this.warn(warning);
     }
     return output;
   }

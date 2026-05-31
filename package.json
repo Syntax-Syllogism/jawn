@@ -1,7 +1,7 @@
 {
   "name": "@syntax-syllogism/jawn",
   "description": "a sf cli plugin for admin and developer workflows",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Syntax-Syllogism/jawn.git"
