@@ -47,6 +47,9 @@ node_modules
 # os specific files
 .DS_Store
 .idea
+
+
+.history/
 notes/
 AGENTS.md
 CLAUDE.md

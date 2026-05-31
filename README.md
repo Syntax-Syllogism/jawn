@@ -107,6 +107,107 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
+_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.2.1/src/commands/jawn/user/access.ts)_
+
+## `sf jawn user provision`
+
+Provision users from user and persona definition files.
+
+```
+USAGE
+  $ sf jawn user provision -o <value> --users-def <value> --personas-def <value> [--json] [--flags-dir <value>]
+    [--external-id <value>] [--no-prompt] [--dry-run] [--api-version <value>]
+
+FLAGS
+  -o, --target-org=<value>    (required) Target org username or alias.
+      --api-version=<value>   Override the api version used for the org connection.
+      --dry-run               Validate and plan actions without any write operations.
+      --external-id=<value>   User field used to match existing users. If omitted, all entries are treated as inserts.
+      --no-prompt             Skip warning confirmation prompts.
+      --personas-def=<value>  (required) Path to persona definition JSON file.
+      --users-def=<value>     (required) Path to user definition JSON file.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Provision users from user and persona definition files.
+
+  Provisions Salesforce users by merging persona defaults with user overrides, enforcing optional profile and role,
+  activating and unfreezing users, and planning or applying assignment changes.
+
+EXAMPLES
+  Dry run with explicit external id:
+
+    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json --external-id ^
+      FederationIdentifier --target-org myOrg --dry-run
+
+  Apply provisioning with no prompt:
+
+    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json --target-org ^
+      myOrg --no-prompt
+
+FLAG DESCRIPTIONS
+  --api-version=<value>  Override the api version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.2.1/src/commands/jawn/user/provision.ts)_
+
+<!-- commandsstop -->
+
+- [`sf jawn user access`](#sf-jawn-user-access)
+- [`sf jawn user provision`](#sf-jawn-user-provision)
+
+## `sf jawn user access`
+
+Audit active-user access for a permission target.
+
+```
+USAGE
+  $ sf jawn user access -o <value> --type field|object --target <value> [--json] [--flags-dir <value>] [--output
+    human|csv|json] [--api-version <value>]
+
+FLAGS
+  -o, --target-org=<value>   (required) Target org username or alias.
+      --api-version=<value>  Override the api version used for the org connection.
+      --output=<option>      [default: human] Output format: human, csv, or json. Defaults to human.
+                             <options: human|csv|json>
+      --target=<value>       (required) Target API name. Use Object.Field for field type and Object for object type.
+      --type=<option>        (required) Target type to audit. Phase 1 supports field and object.
+                             <options: field|object>
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Audit active-user access for a permission target.
+
+  Resolves active users who have access to a target and attributes each access path to Profile, Permission Set, or
+  Permission Set Group sources.
+
+EXAMPLES
+  Field access in human output (default):
+
+    $ sf jawn user access --type field --target Account.CustomField\_\_c --target-org myOrg
+
+  Object access in csv output:
+
+    $ sf jawn user access --type object --target Account --target-org myOrg --output csv
+
+  Field access in json output:
+
+    $ sf jawn user access --type field --target Account.CustomField\_\_c --target-org myOrg --output json
+
+FLAG DESCRIPTIONS
+  --api-version=<value>  Override the api version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
 _See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.2.0/src/commands/jawn/user/access.ts)_
 
 ## `sf jawn user provision`
@@ -158,151 +259,9 @@ _See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllo
 
 <!-- commandsstop -->
 
-- [`sf jawn user provision`](#sf-jawn-user-provision)
-- [`sf jawn user access`](#sf-jawn-user-access)
-
-## `sf jawn user provision`
-
-Provision users from user and persona definition files.
-
-```
-USAGE
-  $ sf jawn user provision -o <value> --users-def <value> --personas-def <value> [--json] [--flags-dir <value>]
-    [--external-id <value>] [--no-prompt] [--dry-run] [--api-version <value>]
-
-FLAGS
-  -o, --target-org=<value>    (required) Target org username or alias.
-      --api-version=<value>   Override the api version used for the org connection.
-      --dry-run               Validate and plan actions without any write operations.
-      --external-id=<value>   User field used to match existing users. If omitted, all entries are treated as inserts.
-      --no-prompt             Skip warning confirmation prompts.
-      --personas-def=<value>  (required) Path to persona definition JSON file.
-      --users-def=<value>     (required) Path to user definition JSON file.
-
-GLOBAL FLAGS
-  --flags-dir=<value>  Import flag values from a directory.
-  --json               Format output as json.
-
-DESCRIPTION
-  Provision users from user and persona definition files.
-
-  Provisions Salesforce users by merging persona defaults with user overrides, enforcing optional profile and role,
-  activating and unfreezing users, and planning or applying assignment changes.
-
-EXAMPLES
-  Dry run with explicit external id:
-
-    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json --external-id ^
-      FederationIdentifier --target-org myOrg --dry-run
-
-  Apply provisioning with no prompt:
-
-    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json --target-org ^
-      myOrg --no-prompt
-
-FLAG DESCRIPTIONS
-  --api-version=<value>  Override the api version used for the org connection.
-
-    Override the api version used for api requests made by this command
-```
-
-_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.1.2/src/commands/jawn/user/provision.ts)_
-
 <!-- commandsstop -->
 
-- [`sf jawn user provision`](#sf-jawn-user-provision)
-
-## `sf jawn user provision`
-
-Provision users from user and persona definition files.
-
-```
-USAGE
-  $ sf jawn user provision -o <value> --users-def <value> --personas-def <value> [--json] [--flags-dir <value>]
-    [--external-id <value>] [--no-prompt] [--dry-run] [--api-version <value>]
-
-FLAGS
-  -o, --target-org=<value>    (required) Target org username or alias.
-      --api-version=<value>   Override the api version used for the org connection.
-      --dry-run               Validate and plan actions without any write operations.
-      --external-id=<value>   User field used to match existing users. If omitted, all entries are treated as inserts.
-      --no-prompt             Skip warning confirmation prompts.
-      --personas-def=<value>  (required) Path to persona definition JSON file.
-      --users-def=<value>     (required) Path to user definition JSON file.
-
-GLOBAL FLAGS
-  --flags-dir=<value>  Import flag values from a directory.
-  --json               Format output as json.
-
-DESCRIPTION
-  Provision users from user and persona definition files.
-
-  Provisions Salesforce users by merging persona defaults with user overrides, enforcing optional profile and role,
-  activating and unfreezing users, and planning or applying assignment changes.
-
-EXAMPLES
-  Dry run with explicit external id:
-
-    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json --external-id ^
-      FederationIdentifier --target-org myOrg --dry-run
-
-  Apply provisioning with no prompt:
-
-    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json --target-org ^
-      myOrg --no-prompt
-
-FLAG DESCRIPTIONS
-  --api-version=<value>  Override the api version used for the org connection.
-
-    Override the api version used for api requests made by this command
-```
-
-_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.1.1/src/commands/jawn/user/provision.ts)_
-
-<!-- commandsstop -->
-
-- [`sf jawn user provision`](#sf-jawn-user-provision)
-
-## `sf jawn user provision`
-
-Provision users from user and persona definition files.
-
-```
-USAGE
-  $ sf jawn user provision --target-org <value> --users-def <value> --personas-def <value>
-    [--external-id <value>] [--no-prompt] [--dry-run] [--api-version <value>] [--json]
-
-FLAGS
-  --target-org=<value>    (required) Target org username or alias.
-  --users-def=<value>     (required) Path to user definition JSON file.
-  --personas-def=<value>  (required) Path to persona definition JSON file.
-  --external-id=<value>   User field used to match existing users. If omitted, all entries are treated as inserts.
-  --no-prompt             Skip warning confirmation prompts.
-  --dry-run               Validate and plan actions without any write operations.
-  --api-version=<value>   Override the api version used for the org connection.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Provisions Salesforce users by merging persona defaults with user overrides, enforcing optional profile
-  and role, activating and unfreezing users, and planning or applying assignment changes.
-
-EXAMPLES
-  Dry run with explicit external id:
-
-    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json \
-        --external-id FederationIdentifier --target-org myOrg --dry-run
-
-  Apply provisioning with no prompt:
-
-    $ sf jawn user provision --users-def config/user-def.json --personas-def config/persona-def.json \
-        --target-org myOrg --no-prompt
-```
-
-<!-- commandsstop -->
-
-### User and persona definition files
+### `user provision` - User and persona definition files
 
 User definitions and persona definitions live in two separate JSON files so that user-specific data stays decoupled from reusable access bundles.
 
@@ -359,7 +318,7 @@ Each assignment category has its own mode property. The default for every catego
 
 Password set/reset is intentionally out of scope.
 
-### Example `user-def.json`
+#### Example `user-def.json`
 
 ```json
 {
@@ -381,7 +340,7 @@ Password set/reset is intentionally out of scope.
 }
 ```
 
-### Example `persona-def.json`
+#### Example `persona-def.json`
 
 ```json
 {
@@ -406,28 +365,7 @@ Password set/reset is intentionally out of scope.
 }
 ```
 
-## `sf jawn user access`
-
-Audit active-user access for a permission target.
-
-```
-USAGE
-  $ sf jawn user access -o <value> --type <value> --target <value> [--output human|csv|json] [--api-version <value>] [--json]
-
-FLAGS
-  -o, --target-org=<value>    (required) Target org username or alias.
-      --type=<value>          (required) Target type to audit. Phase 1 supports field and object.
-                              <options: field|object>
-      --target=<value>        (required) Target API name. Use Object.Field for field type and Object for object type.
-      --output=<value>        Output format: human, csv, or json. Defaults to human.
-                              <options: human|csv|json>
-      --api-version=<value>   Override the api version used for the org connection.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-```
-
-### Access command notes
+### `user access` -- command notes
 
 - The command is read-only and performs no DML.
 - `--type field` expects a qualified field target such as `Account.CustomField__c`.
@@ -437,7 +375,7 @@ GLOBAL FLAGS
 - If a field has no explicit `FieldPermissions` rows (common for some standard fields), the command returns success with a warning; base visibility may still exist outside explicit FLS grants.
 - Very large orgs are constrained by Salesforce query/API limits; the command paginates through query results using `queryMore` until Salesforce indicates completion.
 
-### Access examples
+#### Access examples
 
 ```bash
 # Human output (default)
