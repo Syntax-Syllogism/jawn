@@ -10,7 +10,7 @@ import {
   PersonaDefinition,
   UserFieldMeta,
   validateAndCanonicalizeUsers,
-  validateExternalIdField,
+  validateExternalIdFieldForFlag,
   validatePersonaModes,
 } from '../../../userProvisioning/planner.js';
 
@@ -20,7 +20,7 @@ const messages = Messages.loadMessages('@syntax-syllogism/jawn', 'jawn.user.prov
 type JsonRecord = Record<string, unknown>;
 type SaveError = { message: string; statusCode?: string; fields?: string[] };
 type SaveResult = { success: boolean; id?: string; errors: SaveError[] };
-type ExistingUser = { Id: string; IsActive?: boolean; matchKey: string };
+type ExistingUser = { Id: string; IsActive?: boolean };
 type ExistingAssignment = { Id: string; PermissionSetId?: string; PermissionSetGroupId?: string };
 type ExistingMembership = { Id: string; GroupId: string; GroupType?: string };
 type AssignmentPlan = { adds: string[]; removes: string[] };
@@ -40,6 +40,7 @@ type UserPlan = {
   order: number;
   key: string;
   persona: string;
+  matchedBy: string | null;
   target: JsonRecord;
   existing?: ExistingUser;
   actions: string[];
@@ -58,6 +59,7 @@ type UserResult = {
   key: string;
   id?: string;
   persona: string;
+  matchedBy: string | null;
   status: 'created' | 'updated' | 'failed' | 'planned';
   actions: string[];
   errors: string[];
@@ -99,6 +101,8 @@ const appendCrossReferenceCandidates = (errors: string[], target: JsonRecord): s
   if (candidateFields.length === 0) return errors;
   return errors.concat(messages.getMessage('errorCrossReferenceCandidates', [candidateFields.join(', ')]));
 };
+
+const matchKey = (field: string, value: string): string => `${field}:${value}`;
 
 const pushErrors = (errors: string[], saveResults: SaveResult | SaveResult[] | undefined): void => {
   if (!saveResults) return;
@@ -222,31 +226,42 @@ const resolveReferences = async (
 const getExistingUsers = async (
   conn: Connection,
   users: CanonicalizedUser[],
-  externalIdField: string | undefined
-): Promise<{ existingByKey: Map<string, ExistingUser>; duplicates: Set<string> }> => {
-  const existingByKey = new Map<string, ExistingUser>();
+  defaultExternalIdField: string | undefined
+): Promise<{ existingByField: Map<string, Map<string, ExistingUser>>; duplicates: Set<string> }> => {
+  const existingByField = new Map<string, Map<string, ExistingUser>>();
   const duplicates = new Set<string>();
-  if (!externalIdField) return { existingByKey, duplicates };
-  const matchValues = [
-    ...new Set(
-      users.map((u) => u.fields[externalIdField]).filter((v): v is string => typeof v === 'string' && v.length > 0)
-    ),
-  ];
-  if (matchValues.length === 0) return { existingByKey, duplicates };
-  const rows = (
-    await conn.query<{ Id: string; IsActive: boolean } & Record<string, string>>(
-      `SELECT Id, IsActive, ${externalIdField} FROM User WHERE ${externalIdField} IN (${soqlIn(matchValues)})`
-    )
-  ).records;
-  for (const row of rows) {
-    const key = row[externalIdField];
-    if (existingByKey.has(key)) {
-      duplicates.add(key);
-      continue;
-    }
-    existingByKey.set(key, { Id: row.Id, IsActive: row.IsActive, matchKey: key });
+  const byField = new Map<string, CanonicalizedUser[]>();
+  for (const user of users) {
+    const field = user.matchField ?? defaultExternalIdField;
+    if (!field) continue;
+    const group = byField.get(field) ?? [];
+    group.push(user);
+    byField.set(field, group);
   }
-  return { existingByKey, duplicates };
+  await Promise.all(
+    [...byField.entries()].map(async ([field, group]) => {
+      const values = [
+        ...new Set(group.map((u) => u.fields[field]).filter((v): v is string => typeof v === 'string' && v.length > 0)),
+      ];
+      if (values.length === 0) return;
+      const rows = (
+        await conn.query<{ Id: string; IsActive: boolean } & Record<string, string>>(
+          `SELECT Id, IsActive, ${field} FROM User WHERE ${field} IN (${soqlIn(values)})`
+        )
+      ).records;
+      const fieldMap = existingByField.get(field) ?? new Map<string, ExistingUser>();
+      for (const row of rows) {
+        const key = row[field];
+        if (fieldMap.has(key)) {
+          duplicates.add(matchKey(field, key));
+          continue;
+        }
+        fieldMap.set(key, { Id: row.Id, IsActive: row.IsActive });
+      }
+      existingByField.set(field, fieldMap);
+    })
+  );
+  return { existingByField, duplicates };
 };
 
 const ensureWritableFields = (
@@ -579,32 +594,47 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
     );
     const personas = personasDoc.personas as Record<string, PersonaDefinition>;
     validatePersonaModes(personas);
-    validateExternalIdField(flags['external-id'], fieldMap);
+    validateExternalIdFieldForFlag(flags['external-id'], fieldMap);
     const users = validateAndCanonicalizeUsers(usersDoc.users, personas, fieldMap);
-    const externalIdField = flags['external-id'] ? fieldMap.get(flags['external-id'].toLowerCase())?.name : undefined;
+    const defaultExternalIdField = flags['external-id']
+      ? fieldMap.get(flags['external-id'].toLowerCase())?.name
+      : undefined;
+    const matchFieldFor = (user: CanonicalizedUser): string | undefined => user.matchField ?? defaultExternalIdField;
+    const userEntries = users.map((user, order) => ({ user, order }));
+    const validationFailureUsers = userEntries.filter(
+      ({ user }) => user.validationErrors && user.validationErrors.length > 0
+    );
+    const validUsers = userEntries.filter(({ user }) => !user.validationErrors || user.validationErrors.length === 0);
 
     const [refs, existingResolution] = await Promise.all([
       resolveReferences(conn, personas),
-      getExistingUsers(conn, users, externalIdField),
+      getExistingUsers(
+        conn,
+        validUsers.map(({ user }) => user),
+        defaultExternalIdField
+      ),
     ]);
     if (!this.jsonEnabled()) {
       for (const warning of refs.warnings) this.warn(warning);
       if (refs.warnings.length > 0 && !flags['no-prompt']) await this.confirmWarnings();
     }
 
-    const plans: UserPlan[] = users.map((user, idx) => {
+    const plans: UserPlan[] = validUsers.map(({ user, order }) => {
       const persona = personas[user.persona];
       const errors: string[] = [];
       const target = buildTarget(user, persona, refs, errors);
-      const matchValue = externalIdField ? target[externalIdField] : undefined;
+      const matchedBy = matchFieldFor(user) ?? null;
+      const matchValue = matchedBy ? target[matchedBy] : undefined;
       const existing =
-        externalIdField && typeof matchValue === 'string'
-          ? existingResolution.existingByKey.get(matchValue)
+        matchedBy && typeof matchValue === 'string'
+          ? existingResolution.existingByField.get(matchedBy)?.get(matchValue)
           : undefined;
-      if (typeof matchValue === 'string' && existingResolution.duplicates.has(matchValue)) {
-        errors.push(
-          messages.getMessage('errorDuplicateExternalIdMatch', [externalIdField ?? 'externalId', matchValue])
-        );
+      if (
+        matchedBy &&
+        typeof matchValue === 'string' &&
+        existingResolution.duplicates.has(matchKey(matchedBy, matchValue))
+      ) {
+        errors.push(messages.getMessage('errorDuplicateExternalIdMatch', [matchedBy, matchValue]));
       }
       if (!existing) {
         const missing = missingRequiredFieldsForInsert(target, persona);
@@ -616,16 +646,28 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
       ];
       if (!existing || existing.IsActive !== true) actions.push(flags['dry-run'] ? 'wouldActivate' : 'activated');
       return {
-        planId: `${idx}:${user.inputKey}:${user.persona}`,
-        order: idx,
+        planId: `${order}:${user.inputKey}:${user.persona}`,
+        order,
         key: user.inputKey,
         persona: user.persona,
+        matchedBy,
         target,
         existing,
         actions,
         errors,
       };
     });
+
+    const validationResults: OrderedUserResult[] = validationFailureUsers.map(({ user, order }) => ({
+      planId: `${order}:${user.inputKey}:${user.persona}:validation`,
+      order,
+      key: user.inputKey,
+      persona: user.persona,
+      matchedBy: user.matchField ?? null,
+      status: 'failed',
+      actions: [],
+      errors: (user.validationErrors ?? []).map((error) => messages.getMessage(error.messageKey, error.messageArgs)),
+    }));
 
     const processDryRunPlan = async (plan: UserPlan): Promise<OrderedUserResult> => {
       if (plan.errors.length > 0) {
@@ -634,6 +676,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           order: plan.order,
           key: plan.key,
           persona: plan.persona,
+          matchedBy: plan.matchedBy,
           status: 'failed',
           actions: plan.actions,
           errors: plan.errors,
@@ -657,6 +700,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           key: plan.key,
           id: plan.existing?.Id,
           persona: plan.persona,
+          matchedBy: plan.matchedBy,
           status: 'planned',
           actions: plan.actions,
           errors: plan.errors,
@@ -672,6 +716,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           order: plan.order,
           key: plan.key,
           persona: plan.persona,
+          matchedBy: plan.matchedBy,
           status: 'failed',
           actions: plan.actions,
           errors: [messages.getMessage('errorMissingSaveId')],
@@ -699,6 +744,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
         key: plan.key,
         id,
         persona: plan.persona,
+        matchedBy: plan.matchedBy,
         status,
         actions: plan.actions,
         errors: plan.errors,
@@ -712,13 +758,14 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
         order: p.order,
         key: p.key,
         persona: p.persona,
+        matchedBy: p.matchedBy,
         status: 'failed',
         actions: p.actions,
         errors: p.errors,
       }));
 
     const resultsWithOrder: OrderedUserResult[] = flags['dry-run']
-      ? await runBatches(plans, USER_PROCESS_CONCURRENCY, processDryRunPlan)
+      ? validationResults.concat(await runBatches(plans, USER_PROCESS_CONCURRENCY, processDryRunPlan))
       : await (async (): Promise<OrderedUserResult[]> => {
           const outcomes = await executeBulkUserSaves(conn, plans);
           const saveFailures = outcomes
@@ -730,6 +777,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
                 order: o.plan.order,
                 key: o.plan.key,
                 persona: o.plan.persona,
+                matchedBy: o.plan.matchedBy,
                 status: 'failed' as const,
                 actions: o.plan.actions,
                 errors,
@@ -740,7 +788,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
             USER_PROCESS_CONCURRENCY,
             processPostSave
           );
-          return invalidResults.concat(saveFailures, postSaveResults);
+          return validationResults.concat(invalidResults, saveFailures, postSaveResults);
         })();
     const results = resultsWithOrder
       .sort((a, b) => a.order - b.order)
@@ -748,6 +796,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
         key: result.key,
         id: result.id,
         persona: result.persona,
+        matchedBy: result.matchedBy ?? null,
         status: result.status,
         actions: result.actions,
         errors: result.errors,

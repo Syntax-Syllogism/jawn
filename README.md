@@ -57,8 +57,398 @@ sf plugins
 
 <!-- commands -->
 
+- [`sf jawn aep generate`](#sf-jawn-aep-generate)
+- [`sf jawn aep generate action`](#sf-jawn-aep-generate-action)
+- [`sf jawn aep generate criteria`](#sf-jawn-aep-generate-criteria)
+- [`sf jawn aep generate domain`](#sf-jawn-aep-generate-domain)
+- [`sf jawn aep generate selector`](#sf-jawn-aep-generate-selector)
+- [`sf jawn aep generate selector field-injection`](#sf-jawn-aep-generate-selector-field-injection)
+- [`sf jawn aep generate selector method`](#sf-jawn-aep-generate-selector-method)
+- [`sf jawn aep generate service`](#sf-jawn-aep-generate-service)
+- [`sf jawn aep generate unitofwork`](#sf-jawn-aep-generate-unitofwork)
 - [`sf jawn user access`](#sf-jawn-user-access)
 - [`sf jawn user provision`](#sf-jawn-user-provision)
+
+## `sf jawn aep generate`
+
+Generate multiple AEP artifact groups in one command run.
+
+```
+USAGE
+  $ sf jawn aep generate -o <value> -s <value> [--json] [--flags-dir <value>] [--at4dx] [--fflib] [-a <value>] [-b
+    <value>] [-p <value>] [--prefix <value>] [-r] [-d] [-u] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>       Override the API version used for the org connection.
+  -b, --binding-sequence=<value>  Binding sequence value for AT4DX unit-of-work metadata.
+  -d, --domain                    Include domain artifacts in aggregate generation.
+  -o, --target-org=<value>        (required) Target org username or alias.
+  -p, --output-path=<value>       [default: generated-files] Output folder relative to the Salesforce project root.
+  -r, --selector                  Include selector artifacts in aggregate generation.
+  -s, --sobject=<value>           (required) SObject API name used for generated artifacts.
+  -u, --unit-of-work              Include unit-of-work artifacts in aggregate generation.
+      --at4dx                     Generate AT4DX-flavor artifacts.
+      --dry-run                   Render and validate generation output without writing files.
+      --fflib                     Generate fflib-flavor artifacts.
+      --prefix=<value>            Optional namespace-style class prefix.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate multiple AEP artifact groups in one command run.
+
+  Builds selector/domain/unit-of-work plans from one SObject describe and writes all selected outputs in a single
+  manifest.
+
+EXAMPLES
+  Generate selector, domain, and unit-of-work in AT4DX style:
+
+    $ sf jawn aep generate --target-org myOrg --sobject Account --selector --domain --unit-of-work --at4dx
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate.ts)_
+
+## `sf jawn aep generate action`
+
+Generate an AT4DX domain-process action class, test, and binding metadata.
+
+```
+USAGE
+  $ sf jawn aep generate action -s <value> -c <value> [--json] [--flags-dir <value>] [--trigger-operation
+    Before_Insert|Before_Update|Before_Delete|After_Insert|After_Update|After_Delete|After_Undelete] [--order <value>]
+    [--process-name <value>] [--description <value>] [-a <value>] [-p <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>         Override the API version used for the org connection.
+  -c, --class-name=<value>          (required) Selector method-injection class name.
+  -p, --output-path=<value>         [default: generated-files] Output folder relative to the Salesforce project root.
+  -s, --sobject=<value>             (required) SObject API name used for generated artifacts.
+      --description=<value>         Optional description value written into generated metadata.
+      --dry-run                     Render and validate generation output without writing files.
+      --order=<value>               Order-of-execution token used for AT4DX domain-process bindings (for example, 10.1).
+      --process-name=<value>        Optional process token used to build AT4DX binding developer names.
+      --trigger-operation=<option>  Trigger operation enum value for AT4DX domain-process bindings.
+                                    <options: Before_Insert|Before_Update|Before_Delete|After_Insert|After_Update|After_
+                                    Delete|After_Undelete>
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate an AT4DX domain-process action class, test, and binding metadata.
+
+  Creates offline action scaffolding and a DomainProcessBinding record without requiring an org connection.
+
+EXAMPLES
+  Generate action artifacts with defaults:
+
+    $ sf jawn aep generate action -s Account -c DefaultAccountSloganBasedOnNameAction
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/action.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/action.ts)_
+
+## `sf jawn aep generate criteria`
+
+Generate an AT4DX domain-process criteria class, test, and binding metadata.
+
+```
+USAGE
+  $ sf jawn aep generate criteria -s <value> -c <value> [--json] [--flags-dir <value>] [--trigger-operation
+    Before_Insert|Before_Update|Before_Delete|After_Insert|After_Update|After_Delete|After_Undelete] [--order <value>]
+    [--process-name <value>] [--description <value>] [-a <value>] [-p <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>         Override the API version used for the org connection.
+  -c, --class-name=<value>          (required) Selector method-injection class name.
+  -p, --output-path=<value>         [default: generated-files] Output folder relative to the Salesforce project root.
+  -s, --sobject=<value>             (required) SObject API name used for generated artifacts.
+      --description=<value>         Optional description value written into generated metadata.
+      --dry-run                     Render and validate generation output without writing files.
+      --order=<value>               Order-of-execution token used for AT4DX domain-process bindings (for example, 10.1).
+      --process-name=<value>        Optional process token used to build AT4DX binding developer names.
+      --trigger-operation=<option>  Trigger operation enum value for AT4DX domain-process bindings.
+                                    <options: Before_Insert|Before_Update|Before_Delete|After_Insert|After_Update|After_
+                                    Delete|After_Undelete>
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate an AT4DX domain-process criteria class, test, and binding metadata.
+
+  Creates offline criteria scaffolding and a DomainProcessBinding record without requiring an org connection.
+
+EXAMPLES
+  Generate criteria artifacts with defaults:
+
+    $ sf jawn aep generate criteria -s Account -c AccountNameContainsFishCriteria
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/criteria.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/criteria.ts)_
+
+## `sf jawn aep generate domain`
+
+Generate domain classes, tests, triggers, and metadata for an SObject.
+
+```
+USAGE
+  $ sf jawn aep generate domain -o <value> -s <value> [--json] [--flags-dir <value>] [--at4dx] [--fflib] [-a <value>] [-p
+    <value>] [--prefix <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+  -o, --target-org=<value>   (required) Target org username or alias.
+  -p, --output-path=<value>  [default: generated-files] Output folder relative to the Salesforce project root.
+  -s, --sobject=<value>      (required) SObject API name used for generated artifacts.
+      --at4dx                Generate AT4DX-flavor artifacts.
+      --dry-run              Render and validate generation output without writing files.
+      --fflib                Generate fflib-flavor artifacts.
+      --prefix=<value>       Optional namespace-style class prefix.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate domain classes, tests, triggers, and metadata for an SObject.
+
+  Describes the target SObject and scaffolds domain artifacts in either AT4DX or fflib flavor.
+
+EXAMPLES
+  Generate AT4DX domain files:
+
+    $ sf jawn aep generate domain --target-org myOrg --sobject Account --at4dx
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/domain.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/domain.ts)_
+
+## `sf jawn aep generate selector`
+
+Generate selector classes, tests, and metadata for an SObject.
+
+```
+USAGE
+  $ sf jawn aep generate selector -o <value> -s <value> [--json] [--flags-dir <value>] [--at4dx] [--fflib] [-a <value>] [-p
+    <value>] [--prefix <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+  -o, --target-org=<value>   (required) Target org username or alias.
+  -p, --output-path=<value>  [default: generated-files] Output folder relative to the Salesforce project root.
+  -s, --sobject=<value>      (required) SObject API name used for generated artifacts.
+      --at4dx                Generate AT4DX-flavor artifacts.
+      --dry-run              Render and validate generation output without writing files.
+      --fflib                Generate fflib-flavor artifacts.
+      --prefix=<value>       Optional namespace-style class prefix.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate selector classes, tests, and metadata for an SObject.
+
+  Describes the target SObject and scaffolds selector artifacts in either AT4DX or fflib flavor.
+
+EXAMPLES
+  Generate AT4DX selector files:
+
+    $ sf jawn aep generate selector --target-org myOrg --sobject Account --at4dx
+
+  Generate fflib selector files with a prefix:
+
+    $ sf jawn aep generate selector --target-org myOrg --sobject Property\_\_c --fflib --prefix foobar
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/selector.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/selector.ts)_
+
+## `sf jawn aep generate selector field-injection`
+
+Generate AT4DX selector field-injection metadata (fieldset + binding).
+
+```
+USAGE
+  $ sf jawn aep generate selector field-injection -s <value> --fields <value> [--json] [--flags-dir <value>] [--fieldset-name <value>] [--label
+    <value>] [--description <value>] [-p <value>] [--dry-run]
+
+FLAGS
+  -p, --output-path=<value>    [default: generated-files] Output folder relative to the Salesforce project root.
+  -s, --sobject=<value>        (required) SObject API name used for generated artifacts.
+      --description=<value>    Optional description value written into generated metadata.
+      --dry-run                Render and validate generation output without writing files.
+      --fields=<value>         (required) Comma-separated API names for field-set displayed fields.
+      --fieldset-name=<value>  Optional field-set API name for selector field injection.
+      --label=<value>          Optional label value for generated metadata artifacts.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate AT4DX selector field-injection metadata (fieldset + binding).
+
+  Creates a FieldSet and SelectorConfig_FieldSetInclusion binding offline from a comma-separated field list.
+
+EXAMPLES
+  Generate field-injection metadata:
+
+    $ sf jawn aep generate selector field-injection -s Account --fields Name,Industry
+```
+
+_See code: [src/commands/jawn/aep/generate/selector/field-injection.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/selector/field-injection.ts)_
+
+## `sf jawn aep generate selector method`
+
+Generate an AT4DX selector method-injection class and test.
+
+```
+USAGE
+  $ sf jawn aep generate selector method -s <value> -c <value> --sobject-selector-class-name <value> [--json] [--flags-dir <value>] [-a
+    <value>] [-p <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>                  Override the API version used for the org connection.
+  -c, --class-name=<value>                   (required) Selector method-injection class name.
+  -p, --output-path=<value>                  [default: generated-files] Output folder relative to the Salesforce project
+                                             root.
+  -s, --sobject=<value>                      (required) SObject API name used for generated artifacts.
+      --dry-run                              Render and validate generation output without writing files.
+      --sobject-selector-class-name=<value>  (required) Selector implementation class name used by method injection.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate an AT4DX selector method-injection class and test.
+
+  Creates method-injection scaffolding for an existing selector without requiring an org describe.
+
+EXAMPLES
+  Generate selector method scaffolding:
+
+    $ sf jawn aep generate selector method -c SelectBySloganMethod --sobject-selector-class-name AccountsSelector -s ^
+      Account
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/selector/method.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/selector/method.ts)_
+
+## `sf jawn aep generate service`
+
+Generate service facade/interface/implementation classes and metadata.
+
+```
+USAGE
+  $ sf jawn aep generate service --service-basename <value> [--json] [--flags-dir <value>] [-o <value>] [--at4dx] [--fflib] [-a
+    <value>] [-p <value>] [--prefix <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>       Override the API version used for the org connection.
+  -o, --target-org=<value>        Target org username or alias.
+  -p, --output-path=<value>       [default: generated-files] Output folder relative to the Salesforce project root.
+      --at4dx                     Generate AT4DX-flavor artifacts.
+      --dry-run                   Render and validate generation output without writing files.
+      --fflib                     Generate fflib-flavor artifacts.
+      --prefix=<value>            Optional namespace-style class prefix.
+      --service-basename=<value>  (required) Base name used for generated service classes.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate service facade/interface/implementation classes and metadata.
+
+  Builds service-layer Apex artifacts for the provided basename and flavor.
+
+EXAMPLES
+  Generate an AT4DX service set:
+
+    $ sf jawn aep generate service --target-org myOrg --service-basename LimitMonitors --at4dx
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/service.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/service.ts)_
+
+## `sf jawn aep generate unitofwork`
+
+Generate unit-of-work binding metadata for an SObject.
+
+```
+USAGE
+  $ sf jawn aep generate unitofwork -o <value> -s <value> [--json] [--flags-dir <value>] [--at4dx] [--fflib] [-a <value>] [-b
+    <value>] [-p <value>] [--prefix <value>] [--dry-run]
+
+FLAGS
+  -a, --api-version=<value>       Override the API version used for the org connection.
+  -b, --binding-sequence=<value>  Binding sequence value for AT4DX unit-of-work metadata.
+  -o, --target-org=<value>        (required) Target org username or alias.
+  -p, --output-path=<value>       [default: generated-files] Output folder relative to the Salesforce project root.
+  -s, --sobject=<value>           (required) SObject API name used for generated artifacts.
+      --at4dx                     Generate AT4DX-flavor artifacts.
+      --dry-run                   Render and validate generation output without writing files.
+      --fflib                     Generate fflib-flavor artifacts.
+      --prefix=<value>            Optional namespace-style class prefix.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Generate unit-of-work binding metadata for an SObject.
+
+  Creates AT4DX unit-of-work binding metadata or prints the fflib Application snippet.
+
+EXAMPLES
+  Generate AT4DX unit-of-work binding:
+
+    $ sf jawn aep generate unitofwork --target-org myOrg --sobject Account --at4dx
+
+FLAG DESCRIPTIONS
+  -a, --api-version=<value>  Override the API version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/aep/generate/unitofwork.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/unitofwork.ts)_
 
 ## `sf jawn user access`
 
@@ -107,7 +497,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.2.2/src/commands/jawn/user/access.ts)_
+_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/user/access.ts)_
 
 ## `sf jawn user provision`
 
@@ -122,7 +512,8 @@ FLAGS
   -o, --target-org=<value>    (required) Target org username or alias.
       --api-version=<value>   Override the api version used for the org connection.
       --dry-run               Validate and plan actions without any write operations.
-      --external-id=<value>   User field used to match existing users. If omitted, all entries are treated as inserts.
+      --external-id=<value>   User field used to match existing users by default. Per-user `match` overrides this for
+                              individual rows. If omitted, all entries are treated as inserts.
       --no-prompt             Skip warning confirmation prompts.
       --personas-def=<value>  (required) Path to persona definition JSON file.
       --users-def=<value>     (required) Path to user definition JSON file.
@@ -154,7 +545,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.2.2/src/commands/jawn/user/provision.ts)_
+_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/user/provision.ts)_
 
 <!-- commandsstop -->
 
@@ -167,6 +558,26 @@ User definitions and persona definitions live in two separate JSON files so that
 - User fields must be Salesforce `User` API field names.
 - Input field names are accepted case-insensitively and canonicalized using `User` describe metadata before any DML.
 - User-level fields override persona `userAttributes` when both supply a value.
+- A user may also include a `match` meta key to choose its own lookup field.
+
+#### Match resolution
+
+- `--external-id` sets the default field used to match existing users.
+- A per-user `match` value overrides the flag for that row only.
+- If neither is present, the user is treated as an insert.
+
+#### Mixed-source example
+
+```json
+{
+  "users": [
+    { "persona": "ops", "match": "FederationIdentifier", "FederationIdentifier": "ABC123", "LastName": "Park" },
+    { "persona": "csr", "match": "Username", "Username": "bob@acme.com.dev", "LastName": "Bob" },
+    { "persona": "finance", "match": "Employee_ID__c", "Employee_ID__c": "E-9981", "LastName": "Su" },
+    { "persona": "creator", "Username": "alice@acme.com.dev", "LastName": "Alice" }
+  ]
+}
+```
 
 #### Practical required fields for new user creation
 

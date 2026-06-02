@@ -17,17 +17,23 @@ export type PersonaDefinition = {
 export type UserInput = Record<string, unknown> & { persona?: string };
 
 export type ValidationWarning = { message: string; userKey?: string };
-export type ValidationError = { message: string; userKey?: string };
+export type ValidationError = {
+  messageKey: 'errorInvalidUserMatchField' | 'errorUserMatchFieldEmpty';
+  messageArgs: string[];
+};
 
 export type CanonicalizedUser = {
   inputKey: string;
   persona: string;
+  matchField?: string;
   fields: Record<string, unknown>;
+  validationErrors?: ValidationError[];
 };
 
 export const modeKeys = ['permissionSetMode', 'permissionSetGroupMode', 'publicGroupMode', 'queueMode'] as const;
 
 export const assignmentListKeys = ['permissionSets', 'permissionSetGroups', 'publicGroups', 'queues'] as const;
+const reservedUserKeys = new Set(['persona', 'match']);
 
 export type UserFieldMeta = {
   name: string;
@@ -70,19 +76,63 @@ export const canonicalizeFieldObject = (
   return output;
 };
 
-export const validateExternalIdField = (
+export const validateExternalIdField = (externalId: string, fieldMap: Map<string, UserFieldMeta>): UserFieldMeta => {
+  const meta = fieldMap.get(externalId.toLowerCase());
+  if (!meta) throw new Error(`Invalid match field "${externalId}".`);
+  if (meta.externalId) return meta;
+  const allowed = new Set(['Username', 'Email', 'FederationIdentifier']);
+  if (!allowed.has(meta.name)) {
+    throw new Error(`Invalid match field "${externalId}".`);
+  }
+  return meta;
+};
+
+export const validateExternalIdFieldForFlag = (
   externalId: string | undefined,
   fieldMap: Map<string, UserFieldMeta>
 ): UserFieldMeta | undefined => {
   if (!externalId) return undefined;
-  const meta = fieldMap.get(externalId.toLowerCase());
-  if (!meta) throw new Error(`Invalid --external-id field "${externalId}".`);
-  if (meta.externalId) return meta;
-  const allowed = new Set(['Username', 'Email', 'FederationIdentifier']);
-  if (!allowed.has(meta.name)) {
-    throw new Error('--external-id must be a User external ID field, or one of Username, Email, FederationIdentifier.');
+  try {
+    return validateExternalIdField(externalId, fieldMap);
+  } catch {
+    throw new Error(
+      `Invalid --external-id field "${externalId}". Must be a User external ID field, or one of Username, Email, FederationIdentifier.`
+    );
   }
-  return meta;
+};
+
+const buildValidationError = (messageKey: ValidationError['messageKey'], messageArgs: string[]): ValidationError => ({
+  messageKey,
+  messageArgs,
+});
+
+const resolveUserMatchField = (
+  rawMatch: unknown,
+  merged: Record<string, unknown>,
+  fieldMap: Map<string, UserFieldMeta>
+): { matchField?: string; validationErrors: ValidationError[] } => {
+  if (rawMatch === undefined) return { validationErrors: [] };
+  if (typeof rawMatch !== 'string') {
+    return {
+      validationErrors: [buildValidationError('errorInvalidUserMatchField', [String(rawMatch)])],
+    };
+  }
+  try {
+    const meta = validateExternalIdField(rawMatch, fieldMap);
+    const matchField = meta.name;
+    const matchValue = merged[matchField];
+    if (typeof matchValue !== 'string' || matchValue.length === 0) {
+      return {
+        matchField,
+        validationErrors: [buildValidationError('errorUserMatchFieldEmpty', [matchField])],
+      };
+    }
+    return { matchField, validationErrors: [] };
+  } catch {
+    return {
+      validationErrors: [buildValidationError('errorInvalidUserMatchField', [rawMatch])],
+    };
+  }
 };
 
 export const mergeUserFields = (
@@ -108,16 +158,26 @@ export const validateAndCanonicalizeUsers = (
     const persona = personas[personaName];
     if (!persona) throw new Error(`Unknown persona "${personaName}".`);
     const candidateFields: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(input)) if (k.toLowerCase() !== 'persona') candidateFields[k] = v;
+    for (const [k, v] of Object.entries(input)) {
+      if (!reservedUserKeys.has(k.toLowerCase())) candidateFields[k] = v;
+    }
     const personaFields = canonicalizeFieldObject(persona.userAttributes, fieldMap, `persona ${personaName}`);
     const userFields = canonicalizeFieldObject(candidateFields, fieldMap, `user persona=${personaName}`);
     const merged = mergeUserFields(personaFields, userFields);
+    const rawMatch = Object.entries(input).find(([k]) => k.toLowerCase() === 'match')?.[1];
+    const { matchField, validationErrors } = resolveUserMatchField(rawMatch, merged, fieldMap);
     const inputKey =
       (typeof merged.FederationIdentifier === 'string' && merged.FederationIdentifier) ||
       (typeof merged.Username === 'string' && merged.Username) ||
       (typeof merged.Email === 'string' && merged.Email) ||
       `${personaName}:${users.length + 1}`;
-    users.push({ inputKey, persona: personaName, fields: merged });
+    users.push({
+      inputKey,
+      persona: personaName,
+      matchField,
+      fields: merged,
+      validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+    });
   }
   return users;
 };

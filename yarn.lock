@@ -1625,10 +1625,13 @@
     lodash.get "^4.4.2"
     type-detect "^4.0.8"
 
-"@sinonjs/text-encoding@^0.7.1", "@sinonjs/text-encoding@^0.7.2":
+"@sinonjs/text-encoding@^0.7.1":
   version "0.7.2"
   resolved "https://registry.npmjs.org/@sinonjs/text-encoding/-/text-encoding-0.7.2.tgz"
   integrity sha512-sXXKG+uL9IrKqViTtao2Ws6dy0znu9sOaP1di/jKGW1M6VssO8vlpXCQcpZ+jisQ1tTFAC5Jo/EOzFbggBagFQ==
+
+"@sinonjs/text-encoding@^0.7.2":
+  version "0.7.3"
 
 "@smithy/abort-controller@^3.1.1":
   version "3.1.1"
@@ -2241,6 +2244,11 @@
   version "2.4.4"
   resolved "https://registry.npmjs.org/@types/normalize-package-data/-/normalize-package-data-2.4.4.tgz"
   integrity sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==
+
+"@types/pluralize@^0.0.33":
+  version "0.0.33"
+  resolved "https://registry.npmjs.org/@types/pluralize/-/pluralize-0.0.33.tgz"
+  integrity sha512-JOqsl+ZoCpP4e8TDke9W79FDcSgPAR0l6pixx2JHkhnRjvShyYiAYw2LVsnA7K08Y6DeOnaU6ujmENO4os/cYg==
 
 "@types/prop-types@*":
   version "15.7.13"
@@ -3856,6 +3864,11 @@ esutils@^2.0.2:
   version "2.0.3"
   resolved "https://registry.npmjs.org/esutils/-/esutils-2.0.3.tgz"
   integrity sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==
+
+eta@^4.1.0:
+  version "4.6.0"
+  resolved "https://registry.npmjs.org/eta/-/eta-4.6.0.tgz"
+  integrity sha512-lW6is4T1NFOYnmqGZIfvixqj7A7sSvScF+DN8EK6K58xI5MZ5UvYe0GjopxOXQtZvUn4eDdVuZ8XSoYWTMEKwA==
 
 event-target-shim@^5.0.0:
   version "5.0.1"
@@ -5482,6 +5495,11 @@ marked@^10.0.0:
   resolved "https://registry.npmjs.org/marked/-/marked-10.0.0.tgz"
   integrity sha512-YiGcYcWj50YrwBgNzFoYhQ1hT6GmQbFG8SksnYJX1z4BXTHSOrz1GB5/Jm2yQvMg4nN1FHP4M6r03R10KrVUiA==
 
+marked@^4.2.12:
+  version "4.3.0"
+  resolved "https://registry.npmjs.org/marked/-/marked-4.3.0.tgz"
+  integrity sha512-PRsaiG84bK+AMvxziE/lCFss8juXjNaWzVbN5tXAm4XjeaS9NAHhop+PjQxz2A9h8Q4M/xGmzP8vqNwy6JeK0A==
+
 marked@^4.3.0:
   version "4.3.0"
   resolved "https://registry.npmjs.org/marked/-/marked-4.3.0.tgz"
@@ -5584,6 +5602,13 @@ minimatch@^5.0.1:
   integrity sha512-lKwV/1brpG6mBUFHtb7NUmtABCb2WZZmm2wNiOA5hAb8VdCS4B3dtMWyvcoViccwAW/COERjXLt0zP1zXUN26g==
   dependencies:
     brace-expansion "^2.0.1"
+
+minimatch@^7.1.3:
+  version "7.4.9"
+  resolved "https://registry.npmjs.org/minimatch/-/minimatch-7.4.9.tgz"
+  integrity sha512-Brg/fp/iAVDOQoHxkuN5bEYhyQlZhxddI78yWsCbeEwTHXQjlNLtiJDUsp1GIptVqMI7/gkJMz4vVAc01mpoBw==
+  dependencies:
+    brace-expansion "^2.0.2"
 
 minimatch@^9.0.1:
   version "9.0.5"
@@ -6765,7 +6790,7 @@ shelljs@^0.8.4, shelljs@^0.8.5:
     interpret "^1.0.0"
     rechoir "^0.6.2"
 
-shiki@^0.14.7:
+shiki@^0.14.1, shiki@^0.14.7:
   version "0.14.7"
   resolved "https://registry.npmjs.org/shiki/-/shiki-0.14.7.tgz"
   integrity sha512-dNPAPrxSc87ua2sKJ3H5dQ/6ZaY8RNnaAqK+t0eG7p0Soi2ydiqbGOTaZCqaYvA/uZYfS1LJnemt3Q+mSfcPCg==
@@ -7445,7 +7470,7 @@ typedoc-plugin-missing-exports@0.23.0:
   resolved "https://registry.npmjs.org/typedoc-plugin-missing-exports/-/typedoc-plugin-missing-exports-0.23.0.tgz"
   integrity sha512-9smahDSsFRno9ZwoEshQDuIYMHWGB1E6LUud5qMxR2wNZ0T4DlZz0QjoK3HzXtX34mUpTH0dYtt7NQUK4D6B6Q==
 
-typedoc@^0.25.12, "typedoc@0.22.x || 0.23.x":
+typedoc@^0.25.12:
   version "0.25.13"
   resolved "https://registry.npmjs.org/typedoc/-/typedoc-0.25.13.tgz"
   integrity sha512-pQqiwiJ+Z4pigfOnnysObszLiU3mVLWAExSPf+Mu06G/qsc3wzbuM56SZQvONhHLncLUhYzOVkjFFpFfL5AzhQ==
@@ -7455,7 +7480,17 @@ typedoc@^0.25.12, "typedoc@0.22.x || 0.23.x":
     minimatch "^9.0.3"
     shiki "^0.14.7"
 
-"typescript@^4.6.4 || ^5.2.2", typescript@^5.4.3, typescript@^5.4.5, typescript@>=2.7, typescript@>=4, typescript@>=4.2.0, typescript@>=4.9.5, typescript@~5.4.2, "typescript@4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x || 5.1.x || 5.2.x || 5.3.x || 5.4.x":
+"typedoc@0.22.x || 0.23.x":
+  version "0.23.28"
+  resolved "https://registry.npmjs.org/typedoc/-/typedoc-0.23.28.tgz"
+  integrity sha512-9x1+hZWTHEQcGoP7qFmlo4unUoVJLB0H/8vfO/7wqTnZxg4kPuji9y3uRzEu0ZKez63OJAUmiGhUrtukC6Uj3w==
+  dependencies:
+    lunr "^2.3.9"
+    marked "^4.2.12"
+    minimatch "^7.1.3"
+    shiki "^0.14.1"
+
+"typescript@^4.6.4 || ^5.2.2", typescript@^5.4.3, typescript@^5.4.5, typescript@>=2.7, typescript@>=4, typescript@>=4.2.0, typescript@>=4.9.5, typescript@~5.4.2, "typescript@4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x", "typescript@4.6.x || 4.7.x || 4.8.x || 4.9.x || 5.0.x || 5.1.x || 5.2.x || 5.3.x || 5.4.x":
   version "5.4.5"
   resolved "https://registry.npmjs.org/typescript/-/typescript-5.4.5.tgz"
   integrity sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==

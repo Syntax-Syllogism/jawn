@@ -14,27 +14,39 @@ type FakeConnection = {
   sobjectMap: Record<string, { create: sinon.SinonStub; update: sinon.SinonStub; delete: sinon.SinonStub }>;
 };
 
+const makeSuccessResults = (items: unknown, prefix: string): Array<{ success: true; id: string; errors: [] }> => {
+  const records = Array.isArray(items) ? items : [items];
+  return records.map((_, idx) => ({
+    success: true as const,
+    id: `${prefix}${String(idx + 1).padStart(13, '0')}AAA`,
+    errors: [] as [],
+  }));
+};
+
+const bulkSuccessStub = (prefix: string): sinon.SinonStub =>
+  sinon.stub().callsFake(async (items: unknown) => makeSuccessResults(items, prefix));
+
 const createFakeConnection = (): FakeConnection => {
   const sobjectMap: Record<string, { create: sinon.SinonStub; update: sinon.SinonStub; delete: sinon.SinonStub }> = {
     User: {
-      create: sinon.stub().resolves([{ success: true, id: '005xx0000000001AAA', errors: [] }]),
-      update: sinon.stub().resolves([{ success: true, id: '005xx0000000002AAA', errors: [] }]),
-      delete: sinon.stub().resolves([{ success: true, id: '005xx0000000003AAA', errors: [] }]),
+      create: bulkSuccessStub('005xx000000000'),
+      update: bulkSuccessStub('005xx000000000'),
+      delete: bulkSuccessStub('005xx000000000'),
     },
     UserLogin: {
-      create: sinon.stub().resolves([{ success: true, id: '0LLxx0000000001AAA', errors: [] }]),
-      update: sinon.stub().resolves([{ success: true, id: '0LLxx0000000001AAA', errors: [] }]),
-      delete: sinon.stub().resolves([{ success: true, id: '0LLxx0000000001AAA', errors: [] }]),
+      create: bulkSuccessStub('0LLxx000000000'),
+      update: bulkSuccessStub('0LLxx000000000'),
+      delete: bulkSuccessStub('0LLxx000000000'),
     },
     PermissionSetAssignment: {
-      create: sinon.stub().resolves([{ success: true, id: '0PSxx0000000001AAA', errors: [] }]),
-      update: sinon.stub().resolves([{ success: true, id: '0PSxx0000000001AAA', errors: [] }]),
-      delete: sinon.stub().resolves([{ success: true, id: '0PSxx0000000001AAA', errors: [] }]),
+      create: bulkSuccessStub('0PSxx000000000'),
+      update: bulkSuccessStub('0PSxx000000000'),
+      delete: bulkSuccessStub('0PSxx000000000'),
     },
     GroupMember: {
-      create: sinon.stub().resolves([{ success: true, id: '0GMxx0000000001AAA', errors: [] }]),
-      update: sinon.stub().resolves([{ success: true, id: '0GMxx0000000001AAA', errors: [] }]),
-      delete: sinon.stub().resolves([{ success: true, id: '0GMxx0000000001AAA', errors: [] }]),
+      create: bulkSuccessStub('0GMxx000000000'),
+      update: bulkSuccessStub('0GMxx000000000'),
+      delete: bulkSuccessStub('0GMxx000000000'),
     },
   };
   return {
@@ -242,6 +254,263 @@ describe('jawn user provision command', () => {
     expect(result.summary.created + result.summary.updated).to.equal(2);
   });
 
+  it('routes mixed per-user match fields through distinct lookups', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-mixed.json');
+    const personasPath = join(dir, 'personas-mixed.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            match: 'FederationIdentifier',
+            FederationIdentifier: 'A101',
+            persona: 'default',
+            LastName: 'One',
+            Alias: 'one',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+          {
+            match: 'Username',
+            Username: 'two@example.test',
+            persona: 'default',
+            LastName: 'Two',
+            Alias: 'two',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes("FROM User WHERE FederationIdentifier IN ('A101')"))
+        return { records: [{ Id: '005xx0000000001AAA', IsActive: true, FederationIdentifier: 'A101' }] };
+      if (soql.includes("FROM User WHERE Username IN ('two@example.test')"))
+        return { records: [{ Id: '005xx0000000002AAA', IsActive: true, Username: 'two@example.test' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    const userQueries = fakeConn.query
+      .getCalls()
+      .map((call) => call.args[0] as string)
+      .filter((soql) => soql.includes('FROM User WHERE'));
+    expect(userQueries).to.have.length(2);
+    expect(userQueries.some((soql) => soql.includes('FederationIdentifier IN'))).to.equal(true);
+    expect(userQueries.some((soql) => soql.includes('Username IN'))).to.equal(true);
+    expect(result.users.map((user) => user.matchedBy)).to.deep.equal(['FederationIdentifier', 'Username']);
+    expect(result.summary.updated).to.equal(2);
+  });
+
+  it('does not treat the same value across different match fields as a duplicate', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-shared-value.json');
+    const personasPath = join(dir, 'personas-shared-value.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            match: 'FederationIdentifier',
+            FederationIdentifier: 'A200',
+            persona: 'default',
+            LastName: 'One',
+            Alias: 'one',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+          {
+            match: 'Username',
+            Username: 'A200',
+            persona: 'default',
+            LastName: 'Two',
+            Alias: 'two',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes("FROM User WHERE FederationIdentifier IN ('A200')"))
+        return { records: [{ Id: '005xx0000000001AAA', IsActive: true, FederationIdentifier: 'A200' }] };
+      if (soql.includes("FROM User WHERE Username IN ('A200')"))
+        return { records: [{ Id: '005xx0000000002AAA', IsActive: true, Username: 'A200' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users.every((user) => user.status !== 'failed')).to.equal(true);
+    expect(result.users.map((user) => user.matchedBy)).to.deep.equal(['FederationIdentifier', 'Username']);
+  });
+
+  it('records per-user match validation errors without stopping other users', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-match-invalid.json');
+    const personasPath = join(dir, 'personas-match-invalid.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            match: 'FederationIdentifier',
+            FederationIdentifier: '',
+            persona: 'default',
+            LastName: 'Bad',
+            Alias: 'bad',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+          {
+            Username: 'insert-only@example.test',
+            persona: 'default',
+            LastName: 'Good',
+            Alias: 'good',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].status).to.equal('failed');
+    expect(result.users[0].matchedBy).to.equal('FederationIdentifier');
+    expect(result.users[0].errors.join(' ')).to.include('must be populated');
+    expect(result.users[1].status).to.equal('created');
+    expect(result.users[1].matchedBy).to.equal(null);
+  });
+
+  it('overrides the external-id flag with a per-user match field', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-override.json');
+    const personasPath = join(dir, 'personas-override.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            match: 'Username',
+            Username: 'override@example.test',
+            FederationIdentifier: 'FLAG-IGNORED',
+            persona: 'default',
+            LastName: 'Override',
+            Alias: 'over',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+          {
+            FederationIdentifier: 'FLAG-001',
+            persona: 'default',
+            LastName: 'Flag',
+            Alias: 'flag',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes("FROM User WHERE Username IN ('override@example.test')"))
+        return { records: [{ Id: '005xx0000000001AAA', IsActive: true, Username: 'override@example.test' }] };
+      if (soql.includes("FROM User WHERE FederationIdentifier IN ('FLAG-001')"))
+        return { records: [{ Id: '005xx0000000002AAA', IsActive: true, FederationIdentifier: 'FLAG-001' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': 'FederationIdentifier',
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users.map((user) => user.matchedBy)).to.deep.equal(['Username', 'FederationIdentifier']);
+    expect(result.summary.updated).to.equal(2);
+  });
+
   it('reports global warning count in summary', async () => {
     const fakeConn = createFakeConnection();
     fakeConn.query.callsFake(async (soql: string) => {
@@ -386,7 +655,9 @@ describe('jawn user provision command', () => {
     } as never);
     const result = await UserProvision.run(['--json']);
     expect(result.users[0].status).to.equal('failed');
+    expect(result.users[0].matchedBy).to.equal('FederationIdentifier');
     expect(result.users[0].errors.join(' ')).to.include('Multiple users matched');
+    expect(result.users[0].errors.join(' ')).to.include('FederationIdentifier');
   });
 
   it('surfaces assignment dml failures in per-user errors', async () => {

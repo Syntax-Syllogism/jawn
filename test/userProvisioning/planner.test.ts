@@ -8,6 +8,7 @@ import {
   normalizeMode,
   validateAndCanonicalizeUsers,
   validateExternalIdField,
+  validateExternalIdFieldForFlag,
   validatePersonaModes,
 } from '../../src/userProvisioning/planner.js';
 
@@ -56,7 +57,8 @@ describe('userProvisioning planner', () => {
   it('validates external id field', () => {
     expect(() => validateExternalIdField('FederationIdentifier', fieldMap)).not.to.throw();
     expect(() => validateExternalIdField('Email', fieldMap)).not.to.throw();
-    expect(() => validateExternalIdField('LastName', fieldMap)).to.throw('external ID field');
+    expect(() => validateExternalIdField('LastName', fieldMap)).to.throw('Invalid match field');
+    expect(() => validateExternalIdFieldForFlag('LastName', fieldMap)).to.throw('Invalid --external-id field');
   });
 
   it('canonicalizes and merges users with persona defaults', () => {
@@ -68,6 +70,54 @@ describe('userProvisioning planner', () => {
     expect(users[0].fields.LastName).to.equal('User');
     expect(users[0].fields.Username).to.equal('u1');
     expect(users[0].persona).to.equal('admin');
+  });
+
+  it('canonicalizes per-user match fields case-insensitively', () => {
+    const users = validateAndCanonicalizeUsers(
+      [{ persona: 'admin', match: 'federationidentifier', FederationIdentifier: 'A1', username: 'u1' }],
+      { admin: {} },
+      fieldMap
+    );
+    expect(users[0].matchField).to.equal('FederationIdentifier');
+    expect(users[0].validationErrors).to.equal(undefined);
+  });
+
+  it('records an error for unknown per-user match fields', () => {
+    const users = validateAndCanonicalizeUsers([{ persona: 'admin', match: 'DoesNotExist' }], { admin: {} }, fieldMap);
+    expect(users[0].validationErrors?.[0]).to.deep.equal({
+      messageKey: 'errorInvalidUserMatchField',
+      messageArgs: ['DoesNotExist'],
+    });
+  });
+
+  it('records an error for non-allowed per-user match fields', () => {
+    const users = validateAndCanonicalizeUsers(
+      [{ persona: 'admin', match: 'LastName', LastName: 'User' }],
+      { admin: {} },
+      fieldMap
+    );
+    expect(users[0].validationErrors?.[0]).to.deep.equal({
+      messageKey: 'errorInvalidUserMatchField',
+      messageArgs: ['LastName'],
+    });
+  });
+
+  it('records an error when the matched field is empty', () => {
+    const users = validateAndCanonicalizeUsers(
+      [{ persona: 'admin', match: 'FederationIdentifier', FederationIdentifier: '' }],
+      { admin: {} },
+      fieldMap
+    );
+    expect(users[0].matchField).to.equal('FederationIdentifier');
+    expect(users[0].validationErrors?.[0]).to.deep.equal({
+      messageKey: 'errorUserMatchFieldEmpty',
+      messageArgs: ['FederationIdentifier'],
+    });
+  });
+
+  it('leaves matchField undefined when match is absent', () => {
+    const users = validateAndCanonicalizeUsers([{ persona: 'admin', username: 'u1' }], { admin: {} }, fieldMap);
+    expect(users[0].matchField).to.equal(undefined);
   });
 
   it('validates practical required fields for inserts', () => {

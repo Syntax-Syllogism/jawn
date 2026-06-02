@@ -20,7 +20,7 @@ Path to persona definition JSON file.
 
 # flags.external-id.summary
 
-User field used to match existing users. If omitted, all entries are treated as inserts.
+User field used to match existing users by default. Per-user `match` overrides this for individual rows. If omitted, all entries are treated as inserts.
 
 # flags.no-prompt.summary
 
@@ -69,6 +69,14 @@ Required %s reference "%s" was not found.
 # errorDuplicateExternalIdMatch
 
 Multiple users matched %s="%s".
+
+# errorInvalidUserMatchField
+
+match must name a valid User match field: %s.
+
+# errorUserMatchFieldEmpty
+
+match field %s must be populated on the user.
 
 # errorMissingRequiredFields
 
