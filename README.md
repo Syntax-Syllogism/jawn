@@ -113,7 +113,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate.ts)_
+_See code: [src/commands/jawn/aep/generate.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate.ts)_
 
 ## `sf jawn aep generate action`
 
@@ -158,7 +158,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/action.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/action.ts)_
+_See code: [src/commands/jawn/aep/generate/action.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/action.ts)_
 
 ## `sf jawn aep generate criteria`
 
@@ -203,7 +203,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/criteria.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/criteria.ts)_
+_See code: [src/commands/jawn/aep/generate/criteria.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/criteria.ts)_
 
 ## `sf jawn aep generate domain`
 
@@ -244,7 +244,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/domain.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/domain.ts)_
+_See code: [src/commands/jawn/aep/generate/domain.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/domain.ts)_
 
 ## `sf jawn aep generate selector`
 
@@ -289,7 +289,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/selector.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/selector.ts)_
+_See code: [src/commands/jawn/aep/generate/selector.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/selector.ts)_
 
 ## `sf jawn aep generate selector field-injection`
 
@@ -324,7 +324,7 @@ EXAMPLES
     $ sf jawn aep generate selector field-injection -s Account --fields Name,Industry
 ```
 
-_See code: [src/commands/jawn/aep/generate/selector/field-injection.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/selector/field-injection.ts)_
+_See code: [src/commands/jawn/aep/generate/selector/field-injection.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/selector/field-injection.ts)_
 
 ## `sf jawn aep generate selector method`
 
@@ -365,7 +365,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/selector/method.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/selector/method.ts)_
+_See code: [src/commands/jawn/aep/generate/selector/method.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/selector/method.ts)_
 
 ## `sf jawn aep generate service`
 
@@ -406,7 +406,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/service.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/service.ts)_
+_See code: [src/commands/jawn/aep/generate/service.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/service.ts)_
 
 ## `sf jawn aep generate unitofwork`
 
@@ -448,7 +448,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/unitofwork.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/aep/generate/unitofwork.ts)_
+_See code: [src/commands/jawn/aep/generate/unitofwork.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/aep/generate/unitofwork.ts)_
 
 ## `sf jawn user access`
 
@@ -497,7 +497,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/user/access.ts)_
+_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/user/access.ts)_
 
 ## `sf jawn user provision`
 
@@ -545,7 +545,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.0/src/commands/jawn/user/provision.ts)_
+_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.3.1/src/commands/jawn/user/provision.ts)_
 
 <!-- commandsstop -->
 
