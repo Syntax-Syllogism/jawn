@@ -12,6 +12,7 @@ type FakeConnection = {
   query: sinon.SinonStub;
   sobject: sinon.SinonStub;
   sobjectMap: Record<string, { create: sinon.SinonStub; update: sinon.SinonStub; delete: sinon.SinonStub }>;
+  instanceUrl: string;
 };
 
 const makeSuccessResults = (items: unknown, prefix: string): Array<{ success: true; id: string; errors: [] }> => {
@@ -26,7 +27,7 @@ const makeSuccessResults = (items: unknown, prefix: string): Array<{ success: tr
 const bulkSuccessStub = (prefix: string): sinon.SinonStub =>
   sinon.stub().callsFake(async (items: unknown) => makeSuccessResults(items, prefix));
 
-const createFakeConnection = (): FakeConnection => {
+const createFakeConnection = (instanceUrl = 'https://myorg.my.salesforce.com'): FakeConnection => {
   const sobjectMap: Record<string, { create: sinon.SinonStub; update: sinon.SinonStub; delete: sinon.SinonStub }> = {
     User: {
       create: bulkSuccessStub('005xx000000000'),
@@ -50,6 +51,7 @@ const createFakeConnection = (): FakeConnection => {
     },
   };
   return {
+    instanceUrl,
     describe: sinon.stub().resolves({
       fields: [
         { name: 'Username', createable: true, updateable: true, externalId: false },
@@ -62,8 +64,10 @@ const createFakeConnection = (): FakeConnection => {
         { name: 'EmailEncodingKey', createable: true, updateable: true, externalId: false },
         { name: 'LanguageLocaleKey', createable: true, updateable: true, externalId: false },
         { name: 'ProfileId', createable: true, updateable: true, externalId: false },
+        { name: 'UserRoleId', createable: true, updateable: true, externalId: false },
         { name: 'Title', createable: true, updateable: true, externalId: false },
         { name: 'Department', createable: true, updateable: true, externalId: false },
+        { name: 'UserPermissionKnowledgeUser', createable: true, updateable: true, externalId: false },
         { name: 'FederationIdentifier', createable: true, updateable: true, externalId: true },
       ],
     }),
@@ -184,7 +188,7 @@ describe('jawn user provision command', () => {
           {
             Username: 'new.user@example.test',
             FederationIdentifier: 'A001',
-            persona: 'default',
+            personas: ['default'],
             FirstName: 'New',
             LastName: 'User',
             Alias: 'nuser',
@@ -196,7 +200,7 @@ describe('jawn user provision command', () => {
           {
             Username: 'existing.user@example.test',
             FederationIdentifier: 'A002',
-            persona: 'default',
+            personas: ['default'],
             FirstName: 'Existing',
             LastName: 'User',
             Alias: 'euser',
@@ -266,7 +270,7 @@ describe('jawn user provision command', () => {
           {
             match: 'FederationIdentifier',
             FederationIdentifier: 'A101',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'One',
             Alias: 'one',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -277,7 +281,7 @@ describe('jawn user provision command', () => {
           {
             match: 'Username',
             Username: 'two@example.test',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Two',
             Alias: 'two',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -336,7 +340,7 @@ describe('jawn user provision command', () => {
           {
             match: 'FederationIdentifier',
             FederationIdentifier: 'A200',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'One',
             Alias: 'one',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -347,7 +351,7 @@ describe('jawn user provision command', () => {
           {
             match: 'Username',
             Username: 'A200',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Two',
             Alias: 'two',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -399,7 +403,7 @@ describe('jawn user provision command', () => {
           {
             match: 'FederationIdentifier',
             FederationIdentifier: '',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Bad',
             Alias: 'bad',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -409,7 +413,7 @@ describe('jawn user provision command', () => {
           },
           {
             Username: 'insert-only@example.test',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Good',
             Alias: 'good',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -461,7 +465,7 @@ describe('jawn user provision command', () => {
             match: 'Username',
             Username: 'override@example.test',
             FederationIdentifier: 'FLAG-IGNORED',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Override',
             Alias: 'over',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -471,7 +475,7 @@ describe('jawn user provision command', () => {
           },
           {
             FederationIdentifier: 'FLAG-001',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Flag',
             Alias: 'flag',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -549,7 +553,7 @@ describe('jawn user provision command', () => {
           {
             Username: 'existing.user@example.test',
             FederationIdentifier: 'A002',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'User',
             Alias: 'euser',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -619,7 +623,7 @@ describe('jawn user provision command', () => {
           {
             Username: 'dup@example.test',
             FederationIdentifier: 'A100',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Dup',
             Alias: 'dup',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -674,7 +678,7 @@ describe('jawn user provision command', () => {
         users: [
           {
             Username: 'u@example.test',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'U',
             Alias: 'u',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -737,7 +741,7 @@ describe('jawn user provision command', () => {
         users: [
           {
             FederationIdentifier: 'A200',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'Nope',
             Alias: 'np',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -782,7 +786,7 @@ describe('jawn user provision command', () => {
         users: [
           {
             FederationIdentifier: 'A002',
-            persona: 'default',
+            personas: ['default'],
             LastName: 'User',
             Alias: 'euser',
             TimeZoneSidKey: 'America/Los_Angeles',
@@ -834,5 +838,991 @@ describe('jawn user provision command', () => {
     expect(result.users[0].errors.join(' ')).to.include('Cross-reference update candidates for this user:');
     expect(result.users[0].errors.join(' ')).to.include('ProfileId=');
     expect(result.users[0].errors.join(' ')).to.include('UserRoleId=');
+  });
+
+  // --- Multi-persona tests ---
+
+  it('multi-persona happy path: unions assignment lists', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-multi.json');
+    const personasPath = join(dir, 'personas-multi.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base', 'support'],
+            FirstName: 'John',
+            LastName: 'Doe',
+            Email: 'jdoe@example.test',
+            Username: 'jdoe@example.test.myorg',
+            Alias: 'jdoe',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(
+      personasPath,
+      JSON.stringify({
+        personas: {
+          base: { profile: 'Admin', permissionSets: ['BasePS'] },
+          support: { permissionSets: ['SupportPS'] },
+        },
+      })
+    );
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM PermissionSet WHERE Name IN')) {
+        return {
+          records: [
+            { Id: '0PSbase000000001AAA', Name: 'BasePS' },
+            { Id: '0PSsupport00001AAA', Name: 'SupportPS' },
+          ],
+        };
+      }
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].status).to.equal('created');
+    expect(result.users[0].personas).to.deep.equal(['base', 'support']);
+    const psaCreate = fakeConn.sobjectMap.PermissionSetAssignment.create;
+    const psaArgs = (psaCreate.firstCall.args[0] as Array<{ PermissionSetId: string }>).map((r) => r.PermissionSetId);
+    expect(psaArgs).to.include('0PSbase000000001AAA');
+    expect(psaArgs).to.include('0PSsupport00001AAA');
+  });
+
+  it('conflict on persona profile fails that user, batch continues', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-conflict.json');
+    const personasPath = join(dir, 'personas-conflict.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['a', 'b'],
+            LastName: 'Conflict',
+            Email: 'conflict@example.test',
+          },
+          {
+            personas: ['a'],
+            LastName: 'Good',
+            Username: 'good@example.test',
+            Alias: 'good',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(
+      personasPath,
+      JSON.stringify({
+        personas: {
+          a: { profile: 'Admin' },
+          b: { profile: 'Standard' },
+        },
+      })
+    );
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile'))
+        return {
+          records: [
+            { Id: '00exx0000000001AAA', Name: 'Admin' },
+            { Id: '00exx0000000002AAA', Name: 'Standard' },
+          ],
+        };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    const conflictUser = result.users.find((u) => u.personas.includes('b'));
+    const goodUser = result.users.find((u) => u.personas.length === 1 && u.personas[0] === 'a');
+    expect(conflictUser?.status).to.equal('failed');
+    expect(conflictUser?.errors.join(' ')).to.include('conflict');
+    expect(goodUser?.status).to.equal('created');
+  });
+
+  it('Username default applied on insert when not provided', async () => {
+    const fakeConn = createFakeConnection('https://myorg.my.salesforce.com');
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-default-un.json');
+    const personasPath = join(dir, 'personas-default-un.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['default'],
+            FirstName: 'Jane',
+            LastName: 'Smith',
+            Email: 'jsmith@example.test',
+            Alias: 'jsmi',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.Username).to.equal('jsmith@example.test.myorg');
+  });
+
+  it('Alias default applied on insert when not provided', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-default-alias.json');
+    const personasPath = join(dir, 'personas-default-alias.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['default'],
+            FirstName: 'John',
+            LastName: 'Doe',
+            Username: 'jdoe@example.test',
+            Email: 'jdoe@example.test',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.Alias).to.equal('johdoe');
+  });
+
+  it('defaults NOT applied on update (existing user)', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-no-defaults-update.json');
+    const personasPath = join(dir, 'personas-no-defaults-update.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            FederationIdentifier: 'EX001',
+            personas: ['default'],
+            FirstName: 'John',
+            LastName: 'Doe',
+            Email: 'jdoe@example.test',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('SELECT Id, IsActive, FederationIdentifier FROM User'))
+        return { records: [{ Id: '005xx0000000001AAA', IsActive: true, FederationIdentifier: 'EX001' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': 'FederationIdentifier',
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const updateCall = fakeConn.sobjectMap.User.update.firstCall;
+    const updatedUser = (updateCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(updatedUser.Username).to.equal(undefined);
+    expect(updatedUser.Alias).to.equal(undefined);
+  });
+
+  it('explicit Username and Alias are never overwritten by defaults', async () => {
+    const fakeConn = createFakeConnection('https://myorg.my.salesforce.com');
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-explicit.json');
+    const personasPath = join(dir, 'personas-explicit.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['default'],
+            FirstName: 'Jane',
+            LastName: 'Doe',
+            Email: 'jdoe@example.test',
+            Username: 'explicit@custom.test',
+            Alias: 'custom',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.Username).to.equal('explicit@custom.test');
+    expect(createdUser.Alias).to.equal('custom');
+  });
+
+  it('json output includes personas array per user', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-json.json');
+    const personasPath = join(dir, 'personas-json.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base', 'support'],
+            Username: 'u@example.test',
+            LastName: 'U',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { profile: 'Admin' }, support: {} } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].personas).to.deep.equal(['base', 'support']);
+  });
+
+  // --- Feature 4: user-level profile/role overrides ---
+
+  it('user profile by name overrides persona profile', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-profile-override.json');
+    const personasPath = join(dir, 'personas-profile-override.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            profile: 'Standard',
+            Username: 'u@example.test',
+            LastName: 'User',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile'))
+        return {
+          records: [
+            { Id: '00exx0000000001AAA', Name: 'Admin' },
+            { Id: '00exx0000000002AAA', Name: 'Standard' },
+          ],
+        };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.ProfileId).to.equal('00exx0000000002AAA');
+  });
+
+  it('user raw ProfileId overrides persona profile (regression guard against clobber)', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-profileid-override.json');
+    const personasPath = join(dir, 'personas-profileid-override.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            ProfileId: '00exx0000000002AAA',
+            Username: 'u@example.test',
+            LastName: 'User',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.ProfileId).to.equal('00exx0000000002AAA');
+  });
+
+  it('user role by name overrides persona role', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-role-override.json');
+    const personasPath = join(dir, 'personas-role-override.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            role: 'SalesRep',
+            Username: 'u@example.test',
+            LastName: 'User',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { profile: 'Admin', role: 'CEO' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserRole'))
+        return {
+          records: [
+            { Id: '00Exx0000000001AAA', DeveloperName: 'CEO', Name: 'CEO' },
+            { Id: '00Exx0000000002AAA', DeveloperName: 'SalesRep', Name: 'Sales Rep' },
+          ],
+        };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.UserRoleId).to.equal('00Exx0000000002AAA');
+  });
+
+  it('user profile suppresses persona profile conflict and resolves user value', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-conflict-override.json');
+    const personasPath = join(dir, 'personas-conflict-override.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['a', 'b'],
+            profile: 'Custom',
+            Username: 'u@example.test',
+            LastName: 'User',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { a: { profile: 'Admin' }, b: { profile: 'Standard' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile'))
+        return {
+          records: [
+            { Id: '00exx0000000001AAA', Name: 'Admin' },
+            { Id: '00exx0000000002AAA', Name: 'Standard' },
+            { Id: '00exx0000000003AAA', Name: 'Custom' },
+          ],
+        };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].status).to.equal('created');
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.ProfileId).to.equal('00exx0000000003AAA');
+  });
+
+  it('raw ProfileId suppresses persona profile conflict and is used as-is', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-conflict-rawid.json');
+    const personasPath = join(dir, 'personas-conflict-rawid.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['a', 'b'],
+            ProfileId: '00exx0000000009AAA',
+            Username: 'u@example.test',
+            LastName: 'User',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { a: { profile: 'Admin' }, b: { profile: 'Standard' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile'))
+        return {
+          records: [
+            { Id: '00exx0000000001AAA', Name: 'Admin' },
+            { Id: '00exx0000000002AAA', Name: 'Standard' },
+          ],
+        };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].status).to.equal('created');
+    expect(result.users[0].errors).to.deep.equal([]);
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.ProfileId).to.equal('00exx0000000009AAA');
+  });
+
+  it('profile + ProfileId on same user produces errorUserProfileConflict per row', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-profile-conflict.json');
+    const personasPath = join(dir, 'personas-profile-conflict.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            profile: 'Admin',
+            ProfileId: '00exx0000000001AAA',
+            Username: 'bad@example.test',
+            LastName: 'Bad',
+          },
+          {
+            personas: ['base'],
+            Username: 'good@example.test',
+            LastName: 'Good',
+            Alias: 'good',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    const badUser = result.users.find((u) => u.key.includes('bad'));
+    const goodUser = result.users.find((u) => u.key.includes('good'));
+    expect(badUser?.status).to.equal('failed');
+    expect(badUser?.errors.join(' ')).to.include('profile');
+    expect(badUser?.errors.join(' ')).to.include('ProfileId');
+    expect(goodUser?.status).to.equal('created');
+  });
+
+  it('unresolved user profile name fails that user only', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-unresolved-profile.json');
+    const personasPath = join(dir, 'personas-unresolved-profile.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            profile: 'DoesNotExist',
+            Username: 'bad@example.test',
+            LastName: 'Bad',
+            Alias: 'bad',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+          {
+            personas: ['base'],
+            Username: 'good@example.test',
+            LastName: 'Good',
+            Alias: 'good',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    const badUser = result.users.find((u) => u.key.includes('bad'));
+    const goodUser = result.users.find((u) => u.key.includes('good'));
+    expect(badUser?.status).to.equal('failed');
+    expect(badUser?.errors.join(' ')).to.include('Profile');
+    expect(goodUser?.status).to.equal('created');
+  });
+
+  it('unresolved user profile (no persona profile) reports one error, not a duplicate ProfileId-missing', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-unresolved-noprofile.json');
+    const personasPath = join(dir, 'personas-unresolved-noprofile.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            profile: 'DoesNotExist',
+            Username: 'bad@example.test',
+            LastName: 'Bad',
+            Alias: 'bad',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    // Persona deliberately has NO profile, so the only profile source is the (unresolved) user ref.
+    writeFileSync(personasPath, JSON.stringify({ personas: { base: { permissionSets: [] } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    const badUser = result.users[0];
+    expect(badUser.status).to.equal('failed');
+    expect(badUser.errors.join(' ')).to.include('Profile');
+    // The unresolved reference is the single root cause; ProfileId should NOT also be flagged as missing.
+    expect(badUser.errors.join(' ')).to.not.include('Missing required fields');
+  });
+
+  it('passes through permission-flag user fields, with user value winning over persona', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-permflag.json');
+    const personasPath = join(dir, 'personas-permflag.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['base'],
+            UserPermissionKnowledgeUser: true,
+            Username: 'kuser@example.test',
+            LastName: 'Knowledge',
+            Alias: 'kuser',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    // Persona sets the flag false via userAttributes; the user-level true must win.
+    writeFileSync(
+      personasPath,
+      JSON.stringify({
+        personas: { base: { profile: 'Admin', userAttributes: { UserPermissionKnowledgeUser: false } } },
+      })
+    );
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('FROM UserLogin')) return { records: [] };
+      if (soql.includes('FROM PermissionSetAssignment')) return { records: [] };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].status).to.equal('created');
+    const createCall = fakeConn.sobjectMap.User.create.firstCall;
+    const createdUser = (createCall.args[0] as Array<Record<string, unknown>>)[0];
+    expect(createdUser.UserPermissionKnowledgeUser).to.equal(true);
+  });
+
+  it('surfaces per-user errors in human (non-json) output', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-human-errors.json');
+    const personasPath = join(dir, 'personas-human-errors.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            personas: ['a', 'b'],
+            Username: 'conflict@example.test',
+            LastName: 'Conflict',
+            Alias: 'cflt',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { a: { profile: 'Admin' }, b: { profile: 'Standard' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile'))
+        return {
+          records: [
+            { Id: '00exx0000000001AAA', Name: 'Admin' },
+            { Id: '00exx0000000002AAA', Name: 'Standard' },
+          ],
+        };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    // No --json: per-user failures must be surfaced as warnings, not hidden behind the summary line.
+    await UserProvision.run([]);
+    const warned = sfCommandStubs.warn.getCalls().map((c) => String(c.args[0]));
+    expect(warned.some((m) => m.includes('conflict@example.test') && m.toLowerCase().includes('failed'))).to.equal(
+      true
+    );
+    expect(warned.some((m) => m.includes('Personas conflict on profile'))).to.equal(true);
+  });
+
+  it('legacy persona key produces migration error per user', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-legacy.json');
+    const personasPath = join(dir, 'personas-legacy.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            persona: 'default',
+            Username: 'u@example.test',
+            LastName: 'U',
+            Alias: 'u',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(personasPath, JSON.stringify({ personas: { default: { profile: 'Admin' } } }));
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      return { records: [] };
+    });
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': undefined,
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    const result = await UserProvision.run(['--json']);
+    expect(result.users[0].status).to.equal('failed');
+    expect(result.users[0].errors.join(' ')).to.include('persona');
+    expect(result.users[0].errors.join(' ')).to.include('personas');
   });
 });

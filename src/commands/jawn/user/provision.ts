@@ -2,8 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { Connection, Messages, SfError } from '@salesforce/core';
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
 import {
+  buildDefaultAlias,
+  buildDefaultUsername,
   buildFieldMap,
   CanonicalizedUser,
+  deriveMyDomain,
   isSalesforceId,
   missingRequiredFieldsForInsert,
   normalizeMode,
@@ -39,7 +42,8 @@ type UserPlan = {
   planId: string;
   order: number;
   key: string;
-  persona: string;
+  personas: string[];
+  effectivePersona: PersonaDefinition;
   matchedBy: string | null;
   target: JsonRecord;
   existing?: ExistingUser;
@@ -58,7 +62,7 @@ type OrderedUserResult = UserResult & { order: number; planId: string };
 type UserResult = {
   key: string;
   id?: string;
-  persona: string;
+  personas: string[];
   matchedBy: string | null;
   status: 'created' | 'updated' | 'failed' | 'planned';
   actions: string[];
@@ -191,10 +195,15 @@ const resolveByRoleRef = async (
 
 const resolveReferences = async (
   conn: Connection,
-  personas: Record<string, PersonaDefinition>
+  personas: Record<string, PersonaDefinition>,
+  users: CanonicalizedUser[]
 ): Promise<ResolvedRefs> => {
   const warnings: string[] = [];
   const refs = collectPersonaRefs(personas);
+  for (const user of users) {
+    if (user.profileRef) refs.profiles.add(user.profileRef);
+    if (user.roleRef) refs.roles.add(user.roleRef);
+  }
   const [
     profilesByRef,
     rolesByRef,
@@ -280,19 +289,25 @@ const ensureWritableFields = (
   }
 };
 
-const buildTarget = (
-  user: CanonicalizedUser,
-  persona: PersonaDefinition,
-  refs: ResolvedRefs,
-  errors: string[]
-): JsonRecord => {
+const buildTarget = (user: CanonicalizedUser, refs: ResolvedRefs, errors: string[]): JsonRecord => {
+  const persona = user.effectivePersona;
   const target: JsonRecord = { ...user.fields, IsActive: true };
-  if (persona.profile) {
+  // Profile: user profileRef > user raw ProfileId (already in target) > persona profile
+  if (user.profileRef) {
+    const profileId = refs.profilesByRef.get(user.profileRef);
+    if (!profileId) errors.push(messages.getMessage('errorReferenceRequiredMissing', ['Profile', user.profileRef]));
+    else target.ProfileId = profileId;
+  } else if (!target.ProfileId && persona.profile) {
     const profileId = refs.profilesByRef.get(persona.profile);
     if (!profileId) errors.push(messages.getMessage('errorReferenceRequiredMissing', ['Profile', persona.profile]));
     else target.ProfileId = profileId;
   }
-  if (persona.role) {
+  // Role: user roleRef > user raw UserRoleId (already in target) > persona role
+  if (user.roleRef) {
+    const roleId = refs.rolesByRef.get(user.roleRef);
+    if (!roleId) errors.push(messages.getMessage('errorReferenceRequiredMissing', ['UserRole', user.roleRef]));
+    else target.UserRoleId = roleId;
+  } else if (!target.UserRoleId && persona.role) {
     const roleId = refs.rolesByRef.get(persona.role);
     if (!roleId) errors.push(messages.getMessage('errorReferenceRequiredMissing', ['UserRole', persona.role]));
     else target.UserRoleId = roleId;
@@ -553,6 +568,17 @@ const executeBulkUserSaves = async (conn: Connection, plans: UserPlan[]): Promis
   return outcomes;
 };
 
+const applyInsertDefaults = (target: JsonRecord, myDomain: string | undefined): void => {
+  if (!target.Username && myDomain) {
+    const u = buildDefaultUsername(target.Email, myDomain);
+    if (u) target.Username = u;
+  }
+  if (!target.Alias) {
+    const a = buildDefaultAlias(target.FirstName, target.LastName);
+    if (a) target.Alias = a;
+  }
+};
+
 export default class UserProvision extends SfCommand<ProvisionResult> {
   public static readonly summary = messages.getMessage('summary');
   public static readonly description = messages.getMessage('description');
@@ -596,6 +622,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
     validatePersonaModes(personas);
     validateExternalIdFieldForFlag(flags['external-id'], fieldMap);
     const users = validateAndCanonicalizeUsers(usersDoc.users, personas, fieldMap);
+    const myDomain = deriveMyDomain(conn.instanceUrl);
     const defaultExternalIdField = flags['external-id']
       ? fieldMap.get(flags['external-id'].toLowerCase())?.name
       : undefined;
@@ -607,7 +634,11 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
     const validUsers = userEntries.filter(({ user }) => !user.validationErrors || user.validationErrors.length === 0);
 
     const [refs, existingResolution] = await Promise.all([
-      resolveReferences(conn, personas),
+      resolveReferences(
+        conn,
+        personas,
+        validUsers.map(({ user }) => user)
+      ),
       getExistingUsers(
         conn,
         validUsers.map(({ user }) => user),
@@ -620,9 +651,9 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
     }
 
     const plans: UserPlan[] = validUsers.map(({ user, order }) => {
-      const persona = personas[user.persona];
+      const effectivePersona = user.effectivePersona;
       const errors: string[] = [];
-      const target = buildTarget(user, persona, refs, errors);
+      const target = buildTarget(user, refs, errors);
       const matchedBy = matchFieldFor(user) ?? null;
       const matchValue = matchedBy ? target[matchedBy] : undefined;
       const existing =
@@ -637,7 +668,9 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
         errors.push(messages.getMessage('errorDuplicateExternalIdMatch', [matchedBy, matchValue]));
       }
       if (!existing) {
-        const missing = missingRequiredFieldsForInsert(target, persona);
+        applyInsertDefaults(target, myDomain);
+        const profileIntended = Boolean(user.profileRef) || Boolean(effectivePersona.profile);
+        const missing = missingRequiredFieldsForInsert(target, profileIntended);
         if (missing.length > 0) errors.push(messages.getMessage('errorMissingRequiredFields', [missing.join(', ')]));
       }
       ensureWritableFields(target, existing, fieldMap, errors);
@@ -646,10 +679,11 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
       ];
       if (!existing || existing.IsActive !== true) actions.push(flags['dry-run'] ? 'wouldActivate' : 'activated');
       return {
-        planId: `${order}:${user.inputKey}:${user.persona}`,
+        planId: `${order}:${user.inputKey}:${user.personas.join('+')}`,
         order,
         key: user.inputKey,
-        persona: user.persona,
+        personas: user.personas,
+        effectivePersona,
         matchedBy,
         target,
         existing,
@@ -659,10 +693,10 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
     });
 
     const validationResults: OrderedUserResult[] = validationFailureUsers.map(({ user, order }) => ({
-      planId: `${order}:${user.inputKey}:${user.persona}:validation`,
+      planId: `${order}:${user.inputKey}:${user.personas.join('+')}:validation`,
       order,
       key: user.inputKey,
-      persona: user.persona,
+      personas: user.personas,
       matchedBy: user.matchField ?? null,
       status: 'failed',
       actions: [],
@@ -675,14 +709,13 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           planId: plan.planId,
           order: plan.order,
           key: plan.key,
-          persona: plan.persona,
+          personas: plan.personas,
           matchedBy: plan.matchedBy,
           status: 'failed',
           actions: plan.actions,
           errors: plan.errors,
         };
       }
-      const persona = personas[plan.persona];
       if (flags['dry-run']) {
         const dryRunId = plan.existing?.Id ?? DRY_RUN_CREATE_ID;
         if (plan.existing) {
@@ -693,13 +726,13 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           ).records;
           if (frozenRows.length > 0) plan.actions.push('wouldUnfreeze');
         }
-        await applyAssignments(conn, dryRunId, persona, refs, true, plan.actions, plan.errors);
+        await applyAssignments(conn, dryRunId, plan.effectivePersona, refs, true, plan.actions, plan.errors);
         return {
           planId: plan.planId,
           order: plan.order,
           key: plan.key,
           id: plan.existing?.Id,
-          persona: plan.persona,
+          personas: plan.personas,
           matchedBy: plan.matchedBy,
           status: 'planned',
           actions: plan.actions,
@@ -715,14 +748,13 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
           planId: plan.planId,
           order: plan.order,
           key: plan.key,
-          persona: plan.persona,
+          personas: plan.personas,
           matchedBy: plan.matchedBy,
           status: 'failed',
           actions: plan.actions,
           errors: [messages.getMessage('errorMissingSaveId')],
         };
       }
-      const persona = personas[plan.persona];
       const frozenRows = (
         await conn.query<{ Id: string }>(`SELECT Id FROM UserLogin WHERE UserId = '${esc(id)}' AND IsFrozen = true`)
       ).records;
@@ -736,14 +768,14 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
         if (unfreezeErrors.length > 0) plan.errors.push(...unfreezeErrors);
         else plan.actions.push('unfrozen');
       }
-      await applyAssignments(conn, id, persona, refs, false, plan.actions, plan.errors);
+      await applyAssignments(conn, id, plan.effectivePersona, refs, false, plan.actions, plan.errors);
       const status = plan.errors.length > 0 ? 'failed' : plan.existing ? 'updated' : 'created';
       return {
         planId: plan.planId,
         order: plan.order,
         key: plan.key,
         id,
-        persona: plan.persona,
+        personas: plan.personas,
         matchedBy: plan.matchedBy,
         status,
         actions: plan.actions,
@@ -757,7 +789,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
         planId: p.planId,
         order: p.order,
         key: p.key,
-        persona: p.persona,
+        personas: p.personas,
         matchedBy: p.matchedBy,
         status: 'failed',
         actions: p.actions,
@@ -776,7 +808,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
                 planId: o.plan.planId,
                 order: o.plan.order,
                 key: o.plan.key,
-                persona: o.plan.persona,
+                personas: o.plan.personas,
                 matchedBy: o.plan.matchedBy,
                 status: 'failed' as const,
                 actions: o.plan.actions,
@@ -795,7 +827,7 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
       .map((result) => ({
         key: result.key,
         id: result.id,
-        persona: result.persona,
+        personas: result.personas,
         matchedBy: result.matchedBy ?? null,
         status: result.status,
         actions: result.actions,
@@ -804,6 +836,11 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
 
     const output: ProvisionResult = { summary: summarize(results, refs.warnings.length), users: results };
     if (!this.jsonEnabled()) {
+      for (const user of results) {
+        if (user.errors.length > 0) {
+          this.warn(messages.getMessage('warningUserFailed', [user.key, user.errors.join('; ')]));
+        }
+      }
       this.log(
         messages.getMessage('info.summary', [
           output.summary.total,

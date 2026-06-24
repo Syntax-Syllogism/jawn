@@ -4,7 +4,7 @@ Provision users from user and persona definition files.
 
 # description
 
-Provisions Salesforce users by merging persona defaults with user overrides, enforcing optional profile and role, activating and unfreezing users, and planning or applying assignment changes.
+Provisions Salesforce users by merging multiple personas per user into an effective persona (unioning assignment lists, enforcing singular-value agreement), applying insert-only Username and Alias defaults, enforcing optional profile and role, activating and unfreezing users, and planning or applying assignment changes.
 
 # flags.target-org.summary
 
@@ -89,6 +89,54 @@ Save operation returned no user id.
 # errorCrossReferenceCandidates
 
 Cross-reference update candidates for this user: %s
+
+# errorNoPersonas
+
+Each user must include a non-empty personas array.
+
+# errorLegacyPersonaKey
+
+"persona" is no longer supported; use "personas": [ ... ].
+
+# errorUnknownPersona
+
+Unknown persona "%s".
+
+# errorPersonaConflictProfile
+
+Personas conflict on profile: %s.
+
+# errorPersonaConflictRole
+
+Personas conflict on role: %s.
+
+# errorPersonaConflictUserAttribute
+
+Personas conflict on userAttribute "%s".
+
+# errorPersonaConflictMode
+
+Personas conflict on %s.
+
+# errorUserProfileConflict
+
+Set either "profile" or "ProfileId" on a user, not both.
+
+# errorUserRoleConflict
+
+Set either "role" or "UserRoleId" on a user, not both.
+
+# errorInvalidUserProfile
+
+user "profile" must be a string (a profile name or Id). Got: %s
+
+# errorInvalidUserRole
+
+user "role" must be a string (a role name/DeveloperName or Id). Got: %s
+
+# warningUserFailed
+
+%s failed: %s
 
 # info.summary
 

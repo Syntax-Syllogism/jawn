@@ -14,17 +14,33 @@ export type PersonaDefinition = {
   userAttributes?: Record<string, unknown>;
 };
 
-export type UserInput = Record<string, unknown> & { persona?: string };
+export type UserInput = Record<string, unknown> & { personas?: string[] };
 
 export type ValidationWarning = { message: string; userKey?: string };
 export type ValidationError = {
-  messageKey: 'errorInvalidUserMatchField' | 'errorUserMatchFieldEmpty';
+  messageKey:
+    | 'errorInvalidUserMatchField'
+    | 'errorUserMatchFieldEmpty'
+    | 'errorNoPersonas'
+    | 'errorLegacyPersonaKey'
+    | 'errorUnknownPersona'
+    | 'errorPersonaConflictProfile'
+    | 'errorPersonaConflictRole'
+    | 'errorPersonaConflictUserAttribute'
+    | 'errorPersonaConflictMode'
+    | 'errorUserProfileConflict'
+    | 'errorUserRoleConflict'
+    | 'errorInvalidUserProfile'
+    | 'errorInvalidUserRole';
   messageArgs: string[];
 };
 
 export type CanonicalizedUser = {
   inputKey: string;
-  persona: string;
+  personas: string[];
+  effectivePersona: PersonaDefinition;
+  profileRef?: string;
+  roleRef?: string;
   matchField?: string;
   fields: Record<string, unknown>;
   validationErrors?: ValidationError[];
@@ -33,7 +49,7 @@ export type CanonicalizedUser = {
 export const modeKeys = ['permissionSetMode', 'permissionSetGroupMode', 'publicGroupMode', 'queueMode'] as const;
 
 export const assignmentListKeys = ['permissionSets', 'permissionSetGroups', 'publicGroups', 'queues'] as const;
-const reservedUserKeys = new Set(['persona', 'match']);
+const reservedUserKeys = new Set(['personas', 'match', 'profile', 'role']);
 
 export type UserFieldMeta = {
   name: string;
@@ -143,6 +159,211 @@ export const mergeUserFields = (
   ...userFields,
 });
 
+const unionArray = <T>(arrays: Array<T[] | undefined>): T[] => {
+  const seen = new Set<T>();
+  const result: T[] = [];
+  for (const arr of arrays) {
+    for (const item of arr ?? []) {
+      if (!seen.has(item)) {
+        seen.add(item);
+        result.push(item);
+      }
+    }
+  }
+  return result;
+};
+
+// Extracted to keep mergePersonas under the eslint complexity ceiling (max 20).
+const mergePersonaAttributes = (
+  validDefs: PersonaDefinition[],
+  userOverrideFields: Record<string, unknown>,
+  fieldMap: Map<string, UserFieldMeta>
+): { userAttributes: Record<string, unknown> | undefined; errors: ValidationError[] } => {
+  const attrMap = new Map<string, unknown>();
+  const attrConflicts = new Set<string>();
+  for (const def of validDefs) {
+    for (const [rawKey, value] of Object.entries(def.userAttributes ?? {})) {
+      const canonicalKey = fieldMap.get(rawKey.toLowerCase())?.name ?? rawKey;
+      if (attrMap.has(canonicalKey) && attrMap.get(canonicalKey) !== value) {
+        attrConflicts.add(canonicalKey);
+      } else {
+        attrMap.set(canonicalKey, value);
+      }
+    }
+  }
+  const errors: ValidationError[] = [];
+  for (const conflictKey of attrConflicts) {
+    if (!(conflictKey in userOverrideFields)) {
+      errors.push(buildValidationError('errorPersonaConflictUserAttribute', [conflictKey]));
+    }
+  }
+  return { userAttributes: attrMap.size > 0 ? Object.fromEntries(attrMap) : undefined, errors };
+};
+
+export const mergePersonas = (
+  names: string[],
+  personas: Record<string, PersonaDefinition>,
+  userOverrideFields: Record<string, unknown>,
+  fieldMap: Map<string, UserFieldMeta>,
+  hasProfileOverride = false,
+  hasRoleOverride = false
+): { effective: PersonaDefinition; errors: ValidationError[] } => {
+  const errors: ValidationError[] = [];
+  const validDefs: PersonaDefinition[] = [];
+
+  for (const name of names) {
+    const def = personas[name];
+    if (!def) {
+      errors.push(buildValidationError('errorUnknownPersona', [name]));
+    } else {
+      validDefs.push(def);
+    }
+  }
+
+  const effective: PersonaDefinition = {};
+
+  // Union assignment lists
+  for (const listKey of assignmentListKeys) {
+    const unioned = unionArray(validDefs.map((d) => d[listKey]));
+    if (unioned.length > 0) effective[listKey] = unioned;
+  }
+
+  // Singular: profile
+  const profiles = [...new Set(validDefs.map((d) => d.profile).filter((v): v is string => Boolean(v)))];
+  if (profiles.length > 1 && !hasProfileOverride) {
+    errors.push(buildValidationError('errorPersonaConflictProfile', [profiles.join(', ')]));
+  } else if (profiles.length === 1) {
+    effective.profile = profiles[0];
+  }
+
+  // Singular: role
+  const roles = [...new Set(validDefs.map((d) => d.role).filter((v): v is string => Boolean(v)))];
+  if (roles.length > 1 && !hasRoleOverride) {
+    errors.push(buildValidationError('errorPersonaConflictRole', [roles.join(', ')]));
+  } else if (roles.length === 1) {
+    effective.role = roles[0];
+  }
+
+  // Modes
+  for (const modeKey of modeKeys) {
+    const modes = [...new Set(validDefs.map((d) => d[modeKey]).filter((v): v is AssignmentMode => v !== undefined))];
+    if (modes.length > 1) {
+      errors.push(buildValidationError('errorPersonaConflictMode', [modeKey]));
+    } else if (modes.length === 1) {
+      effective[modeKey] = modes[0];
+    }
+  }
+
+  const { userAttributes, errors: attrErrors } = mergePersonaAttributes(validDefs, userOverrideFields, fieldMap);
+  errors.push(...attrErrors);
+  if (userAttributes) effective.userAttributes = userAttributes;
+
+  return { effective, errors };
+};
+
+const sanitizeAliasPart = (s: unknown): string => (typeof s === 'string' ? s : '').replace(/[^a-z0-9]/gi, '');
+
+export const buildDefaultAlias = (firstName?: unknown, lastName?: unknown): string | undefined => {
+  const first = sanitizeAliasPart(firstName);
+  const last = sanitizeAliasPart(lastName);
+  if (!first && !last) return undefined;
+  const firstDeficit = Math.max(0, 3 - first.length);
+  const lastDeficit = Math.max(0, 3 - last.length);
+  const firstPart = first.slice(0, 3 + lastDeficit);
+  const lastPart = last.slice(0, 3 + firstDeficit);
+  const alias = (firstPart + lastPart).toLowerCase().slice(0, 8);
+  return alias || undefined;
+};
+
+export const buildDefaultUsername = (email: unknown, myDomain: string): string | undefined =>
+  typeof email === 'string' && email.length > 0 ? `${email}.${myDomain}` : undefined;
+
+export const deriveMyDomain = (instanceUrl: string): string | undefined => {
+  try {
+    const host = new URL(instanceUrl).hostname;
+    const firstLabel = host.split('.')[0];
+    return firstLabel || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const resolveInputKey = (fields: Record<string, unknown>, fallback: string): string =>
+  (typeof fields.FederationIdentifier === 'string' && fields.FederationIdentifier) ||
+  (typeof fields.Username === 'string' && fields.Username) ||
+  (typeof fields.Email === 'string' && fields.Email) ||
+  fallback;
+
+// Reads a user-level profile/role meta key. Empty/whitespace and null are treated as
+// "not provided"; any other non-string value is reported so malformed input is not silently dropped.
+const extractUserRef = (
+  value: unknown,
+  invalidKey: 'errorInvalidUserProfile' | 'errorInvalidUserRole',
+  errors: ValidationError[]
+): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    errors.push(buildValidationError(invalidKey, [String(value)]));
+    return undefined;
+  }
+  return value.trim() === '' ? undefined : value;
+};
+
+const canonicalizeValidUser = (
+  input: UserInput,
+  names: string[],
+  personas: Record<string, PersonaDefinition>,
+  fieldMap: Map<string, UserFieldMeta>,
+  fallback: string
+): CanonicalizedUser => {
+  const candidateFields: Record<string, unknown> = {};
+  const errors: ValidationError[] = [];
+  let profileRef: string | undefined;
+  let roleRef: string | undefined;
+  for (const [k, v] of Object.entries(input)) {
+    const lower = k.toLowerCase();
+    if (lower === 'profile') profileRef = extractUserRef(v, 'errorInvalidUserProfile', errors);
+    else if (lower === 'role') roleRef = extractUserRef(v, 'errorInvalidUserRole', errors);
+    else if (!reservedUserKeys.has(lower)) candidateFields[k] = v;
+  }
+  const userFields = canonicalizeFieldObject(candidateFields, fieldMap, `user personas=${names.join('+')}`);
+  if (profileRef !== undefined && 'ProfileId' in userFields) {
+    errors.push(buildValidationError('errorUserProfileConflict', []));
+    profileRef = undefined;
+  }
+  if (roleRef !== undefined && 'UserRoleId' in userFields) {
+    errors.push(buildValidationError('errorUserRoleConflict', []));
+    roleRef = undefined;
+  }
+  // A raw ProfileId/UserRoleId is also a user-level override, so it must suppress
+  // a persona profile/role conflict the same way the profile/role meta keys do.
+  const hasProfileOverride = profileRef !== undefined || 'ProfileId' in userFields;
+  const hasRoleOverride = roleRef !== undefined || 'UserRoleId' in userFields;
+  const { effective, errors: mergeErrors } = mergePersonas(
+    names,
+    personas,
+    userFields,
+    fieldMap,
+    hasProfileOverride,
+    hasRoleOverride
+  );
+  const personaFields = canonicalizeFieldObject(effective.userAttributes, fieldMap, 'effective persona');
+  const merged = mergeUserFields(personaFields, userFields);
+  const rawMatch = Object.entries(input).find(([k]) => k.toLowerCase() === 'match')?.[1];
+  const { matchField, validationErrors: matchErrors } = resolveUserMatchField(rawMatch, merged, fieldMap);
+  const allErrors = [...errors, ...mergeErrors, ...matchErrors];
+  return {
+    inputKey: resolveInputKey(merged, `${names.join('+')}:${fallback}`),
+    personas: names,
+    effectivePersona: effective,
+    profileRef,
+    roleRef,
+    matchField,
+    fields: merged,
+    validationErrors: allErrors.length > 0 ? allErrors : undefined,
+  };
+};
+
 export const validateAndCanonicalizeUsers = (
   rawUsers: unknown,
   personas: Record<string, PersonaDefinition>,
@@ -153,31 +374,45 @@ export const validateAndCanonicalizeUsers = (
   for (const rawUser of rawUsers) {
     if (!rawUser || typeof rawUser !== 'object') throw new Error('Each user entry must be an object.');
     const input = rawUser as UserInput;
-    const personaName = input.persona;
-    if (!personaName || typeof personaName !== 'string') throw new Error('Each user entry must include persona.');
-    const persona = personas[personaName];
-    if (!persona) throw new Error(`Unknown persona "${personaName}".`);
-    const candidateFields: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(input)) {
-      if (!reservedUserKeys.has(k.toLowerCase())) candidateFields[k] = v;
+    const fallback = String(users.length + 1);
+
+    const hasLegacyPersonaKey = Object.keys(input).some((k) => k.toLowerCase() === 'persona');
+    if (hasLegacyPersonaKey) {
+      const fields: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(input)) {
+        if (k.toLowerCase() !== 'persona') fields[k] = v;
+      }
+      const userFields = canonicalizeFieldObject(fields, fieldMap, 'user');
+      users.push({
+        inputKey: resolveInputKey(userFields, `unknown:${fallback}`),
+        personas: [],
+        effectivePersona: {},
+        fields: userFields,
+        validationErrors: [buildValidationError('errorLegacyPersonaKey', [])],
+      });
+      continue;
     }
-    const personaFields = canonicalizeFieldObject(persona.userAttributes, fieldMap, `persona ${personaName}`);
-    const userFields = canonicalizeFieldObject(candidateFields, fieldMap, `user persona=${personaName}`);
-    const merged = mergeUserFields(personaFields, userFields);
-    const rawMatch = Object.entries(input).find(([k]) => k.toLowerCase() === 'match')?.[1];
-    const { matchField, validationErrors } = resolveUserMatchField(rawMatch, merged, fieldMap);
-    const inputKey =
-      (typeof merged.FederationIdentifier === 'string' && merged.FederationIdentifier) ||
-      (typeof merged.Username === 'string' && merged.Username) ||
-      (typeof merged.Email === 'string' && merged.Email) ||
-      `${personaName}:${users.length + 1}`;
-    users.push({
-      inputKey,
-      persona: personaName,
-      matchField,
-      fields: merged,
-      validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
-    });
+
+    const personaNames = input.personas;
+    const validNames =
+      Array.isArray(personaNames) && personaNames.length > 0 && personaNames.every((n) => typeof n === 'string');
+    if (!validNames) {
+      const fields: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(input)) {
+        if (!reservedUserKeys.has(k.toLowerCase())) fields[k] = v;
+      }
+      const userFields = canonicalizeFieldObject(fields, fieldMap, 'user');
+      users.push({
+        inputKey: resolveInputKey(userFields, `unknown:${fallback}`),
+        personas: [],
+        effectivePersona: {},
+        fields: userFields,
+        validationErrors: [buildValidationError('errorNoPersonas', [])],
+      });
+      continue;
+    }
+
+    users.push(canonicalizeValidUser(input, personaNames, personas, fieldMap, fallback));
   }
   return users;
 };
@@ -204,11 +439,11 @@ export const practicalRequiredUserFields = [
   'LanguageLocaleKey',
 ] as const;
 
-export const missingRequiredFieldsForInsert = (
-  fields: Record<string, unknown>,
-  persona: PersonaDefinition
-): string[] => {
+// `profileIntended` is true when a profile was specified from any source (user `profile` meta key,
+// raw `ProfileId`, or persona `profile`). When intended but unresolved, buildTarget already reports a
+// reference-missing error, so we must not also report ProfileId as missing here (avoids a double error).
+export const missingRequiredFieldsForInsert = (fields: Record<string, unknown>, profileIntended: boolean): string[] => {
   const missing: string[] = practicalRequiredUserFields.filter((field) => !fields[field]);
-  if (!persona.profile && !fields.ProfileId) missing.push('ProfileId');
+  if (!profileIntended && !fields.ProfileId) missing.push('ProfileId');
   return missing;
 };
