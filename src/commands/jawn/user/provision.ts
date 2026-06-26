@@ -1,6 +1,16 @@
-import { readFile } from 'node:fs/promises';
 import { Connection, Messages, SfError } from '@salesforce/core';
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
+import { confirmWithTimeout } from '../../../userShared/prompt.js';
+import {
+  asArray,
+  esc,
+  formatSaveError,
+  pushErrors,
+  readJsonOrThrow as readJsonOrThrowShared,
+  runBatches,
+  soqlIn,
+  type SaveResult,
+} from '../../../userShared/sfUtils.js';
 import {
   buildDefaultAlias,
   buildDefaultUsername,
@@ -21,8 +31,6 @@ Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
 const messages = Messages.loadMessages('@syntax-syllogism/jawn', 'jawn.user.provision');
 
 type JsonRecord = Record<string, unknown>;
-type SaveError = { message: string; statusCode?: string; fields?: string[] };
-type SaveResult = { success: boolean; id?: string; errors: SaveError[] };
 type ExistingUser = { Id: string; IsActive?: boolean };
 type ExistingAssignment = { Id: string; PermissionSetId?: string; PermissionSetGroupId?: string };
 type ExistingMembership = { Id: string; GroupId: string; GroupType?: string };
@@ -76,25 +84,9 @@ export type ProvisionResult = {
 
 const DRY_RUN_CREATE_ID = 'dry-run-create';
 const USER_PROCESS_CONCURRENCY = 10;
-const esc = (value: string): string => value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
-const soqlIn = (values: string[]): string => values.map((v) => `'${esc(v)}'`).join(',');
-const asArray = <T>(value: T | T[]): T[] => (Array.isArray(value) ? value : [value]);
-const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8')) as unknown;
 
-const readJsonOrThrow = async (path: string): Promise<unknown> => {
-  try {
-    return await readJson(path);
-  } catch (error) {
-    throw new SfError(
-      messages.getMessage('errorInvalidJson', [path, error instanceof Error ? error.message : String(error)])
-    );
-  }
-};
-
-const formatSaveError = (error: SaveError): string => {
-  const fieldSuffix = error.fields && error.fields.length > 0 ? ` (fields: ${error.fields.join(', ')})` : '';
-  return error.statusCode ? `${error.statusCode}: ${error.message}${fieldSuffix}` : error.message;
-};
+const readJsonOrThrow = async (path: string): Promise<unknown> =>
+  readJsonOrThrowShared(path, (filePath, error) => messages.getMessage('errorInvalidJson', [filePath, error]));
 
 const appendCrossReferenceCandidates = (errors: string[], target: JsonRecord): string[] => {
   const hasCrossRefError = errors.some((e) => e.includes('INVALID_CROSS_REFERENCE_KEY'));
@@ -107,12 +99,6 @@ const appendCrossReferenceCandidates = (errors: string[], target: JsonRecord): s
 };
 
 const matchKey = (field: string, value: string): string => `${field}:${value}`;
-
-const pushErrors = (errors: string[], saveResults: SaveResult | SaveResult[] | undefined): void => {
-  if (!saveResults) return;
-  for (const result of asArray(saveResults))
-    if (!result.success) errors.push(...result.errors.map((e) => formatSaveError(e)));
-};
 
 const collectPersonaRefs = (personas: Record<string, PersonaDefinition>): Record<string, Set<string>> => {
   const refs = {
@@ -501,13 +487,6 @@ const applyAssignments = async (
   await performAssignmentDml(conn, userId, permSetPlan, permSetGroupPlan, membershipPlan, errors);
 };
 
-const batch = <T>(items: T[], size: number): T[][] =>
-  items.reduce<T[][]>((groups, item, idx) => {
-    if (idx % size === 0) groups.push([]);
-    groups[groups.length - 1].push(item);
-    return groups;
-  }, []);
-
 const summarize = (results: UserResult[], globalWarningCount: number): ProvisionResult['summary'] => ({
   total: results.length,
   created: results.filter((r) => r.status === 'created').length,
@@ -515,15 +494,6 @@ const summarize = (results: UserResult[], globalWarningCount: number): Provision
   failed: results.filter((r) => r.status === 'failed').length,
   warnings: globalWarningCount,
 });
-
-const runBatches = async <T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> => {
-  const itemBatches = batch(items, size);
-  return itemBatches.reduce<Promise<R[]>>(async (accPromise, itemBatch) => {
-    const acc = await accPromise;
-    const next = await Promise.all(itemBatch.map(fn));
-    return acc.concat(next);
-  }, Promise.resolve([]));
-};
 
 const executeBulkUserSaves = async (conn: Connection, plans: UserPlan[]): Promise<UserSaveOutcome[]> => {
   const validPlans = plans.filter((p) => p.errors.length === 0);
@@ -854,22 +824,13 @@ export default class UserProvision extends SfCommand<ProvisionResult> {
   }
 
   private async confirmWarnings(): Promise<void> {
-    let timer: NodeJS.Timeout | undefined;
-    try {
-      const timeoutPromise = new Promise<boolean>((resolve) => {
-        timer = setTimeout(() => resolve(false), 10_000);
-        timer.unref();
-      });
-      const shouldContinue = await Promise.race([
-        this.confirm({ message: messages.getMessage('promptWarningsContinue') }),
-        timeoutPromise,
-      ]);
-      if (!shouldContinue) {
-        this.warn(messages.getMessage('warningPromptTimeout'));
-        throw new SfError(messages.getMessage('errorPromptDeclined'));
-      }
-    } finally {
-      if (timer) clearTimeout(timer);
+    const { confirmed } = await confirmWithTimeout(
+      (message) => this.confirm({ message }),
+      messages.getMessage('promptWarningsContinue')
+    );
+    if (!confirmed) {
+      this.warn(messages.getMessage('warningPromptTimeout'));
+      throw new SfError(messages.getMessage('errorPromptDeclined'));
     }
   }
 }
