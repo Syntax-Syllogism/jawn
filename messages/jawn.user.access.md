@@ -58,7 +58,7 @@ No active users matched this target.
 
 - Field access in human output (default):
 
-  <%= config.bin %> <%= command.id %> --type field --target Account.CustomField\_\_c --target-org myOrg
+  <%= config.bin %> <%= command.id %> --type field --target Account.CustomField__c --target-org myOrg
 
 - Object access in csv output:
 
@@ -66,4 +66,4 @@ No active users matched this target.
 
 - Field access in json output:
 
-  <%= config.bin %> <%= command.id %> --type field --target Account.CustomField\_\_c --target-org myOrg --output json
+  <%= config.bin %> <%= command.id %> --type field --target Account.CustomField__c --target-org myOrg --output json

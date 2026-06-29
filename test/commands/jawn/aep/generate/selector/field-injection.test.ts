@@ -3,16 +3,25 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SfProject } from '@salesforce/core';
+import { stubSfCommandUx } from '@salesforce/sf-plugins-core';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import JawnAepGenerateSelectorFieldInjection from '../../../../../../src/commands/jawn/aep/generate/selector/field-injection.js';
 
 describe('jawn aep generate selector field-injection', () => {
+  let sandbox: sinon.SinonSandbox;
+  let sfCommandStubs: ReturnType<typeof stubSfCommandUx>;
+
   beforeEach(() => {
     process.env.SF_DISABLE_LOG_FILE = 'true';
+    sandbox = sinon.createSandbox();
+    sfCommandStubs = stubSfCommandUx(sandbox);
   });
 
-  afterEach(() => sinon.restore());
+  afterEach(() => {
+    sinon.restore();
+    sandbox.restore();
+  });
 
   it('writes fieldset and binding from comma-separated fields', async () => {
     const projectDir = mkdtempSync(join(tmpdir(), 'jawn-aep-field-injection-'));
@@ -39,6 +48,30 @@ describe('jawn aep generate selector field-injection', () => {
       expect(xml).to.include('<field>Name</field>');
       expect(xml).to.include('<field>Industry</field>');
     }
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it('prints unmangled custom field API names in human binding review output', async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'jawn-aep-field-injection-'));
+    sinon.stub(SfProject, 'resolveProjectPath').resolves(projectDir);
+
+    await JawnAepGenerateSelectorFieldInjection.run([
+      '--sobject',
+      'Account',
+      '--fields',
+      'Name, Industry',
+      '--output-path',
+      'generated',
+    ]);
+
+    const output = sfCommandStubs.log
+      .getCalls()
+      .map((call) => call.args[0] as string)
+      .join('\n');
+    expect(output).to.include('BindingSObjectAlternate__c (nil)');
+    expect(output).to.include('IsActive__c=true');
+    expect(output).to.not.include('**c');
+    expect(output).to.not.include('\\_\\_c');
     await rm(projectDir, { recursive: true, force: true });
   });
 

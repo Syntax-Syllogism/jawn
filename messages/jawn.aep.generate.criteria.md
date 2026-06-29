@@ -12,7 +12,7 @@ Generated %s files (%s skipped).
 
 # info.reviewBinding
 
-Review the generated binding defaults: RelatedDomainBindingSObjectAlternate**c (nil), ExecuteAsynchronous**c=false, LogicalInverse**c=false, PreventRecursive**c=false, ProcessContext**c=TriggerExecution, DomainMethodToken**c (nil), and Description\_\_c.
+Review the generated binding defaults: RelatedDomainBindingSObjectAlternate__c (nil), ExecuteAsynchronous__c=false, LogicalInverse__c=false, PreventRecursive__c=false, ProcessContext__c=TriggerExecution, DomainMethodToken__c (nil), and Description__c.
 
 # error.invalidOrder
 

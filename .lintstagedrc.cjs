@@ -1,3 +1,3 @@
 module.exports = {
-  '**/*.{js,json,md}?(x)': () => 'npm run reformat',
+  '*.md': 'markdownlint-cli2 --fix',
 };

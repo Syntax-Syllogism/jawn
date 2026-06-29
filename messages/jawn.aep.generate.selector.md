@@ -18,4 +18,4 @@ Generated %s files (%s skipped).
 
 - Generate fflib selector files with a prefix:
 
-  <%= config.bin %> <%= command.id %> --target-org myOrg --sobject Property\_\_c --fflib --prefix foobar
+  <%= config.bin %> <%= command.id %> --target-org myOrg --sobject Property__c --fflib --prefix foobar

@@ -1,6 +1,6 @@
-# Contributing to MavMeta
+# Contributing to Jawn
 
-Thank you for your interest in contributing to MavMeta! This is a hobbyist project, and we welcome all kinds of contributions.
+Thank you for your interest in contributing to Jawn! This is an open-source Salesforce CLI plugin, and we welcome all kinds of contributions.
 
 ## How to Contribute
 

@@ -12,7 +12,7 @@ Generated %s files (%s skipped).
 
 # info.reviewBinding
 
-Review the generated binding defaults: BindingSObjectAlternate**c (nil), IsActive**c=true, and metadata label/description values.
+Review the generated binding defaults: BindingSObjectAlternate__c (nil), IsActive__c=true, and metadata label/description values.
 
 # error.fieldsetNameTooLong
 

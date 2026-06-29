@@ -3,16 +3,25 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SfProject } from '@salesforce/core';
+import { stubSfCommandUx } from '@salesforce/sf-plugins-core';
 import { expect } from 'chai';
 import sinon from 'sinon';
 import JawnAepGenerateCriteria from '../../../../../src/commands/jawn/aep/generate/criteria.js';
 
 describe('jawn aep generate criteria', () => {
+  let sandbox: sinon.SinonSandbox;
+  let sfCommandStubs: ReturnType<typeof stubSfCommandUx>;
+
   beforeEach(() => {
     process.env.SF_DISABLE_LOG_FILE = 'true';
+    sandbox = sinon.createSandbox();
+    sfCommandStubs = stubSfCommandUx(sandbox);
   });
 
-  afterEach(() => sinon.restore());
+  afterEach(() => {
+    sinon.restore();
+    sandbox.restore();
+  });
 
   it('parses argv and writes criteria files', async () => {
     const projectDir = mkdtempSync(join(tmpdir(), 'jawn-aep-criteria-'));
@@ -66,6 +75,37 @@ describe('jawn aep generate criteria', () => {
     expect(
       normalized.some((p) => p.endsWith('DomainProcessBinding.FishCompanySlogans10_10Criteria.md-meta.xml'))
     ).to.equal(true);
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it('prints unmangled custom field API names in human binding review output', async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'jawn-aep-criteria-'));
+    sinon.stub(SfProject, 'resolveProjectPath').resolves(projectDir);
+
+    await JawnAepGenerateCriteria.run([
+      '--class-name',
+      'CriteriaJawn',
+      '--sobject',
+      'Account',
+      '--trigger-operation',
+      'Before_Insert',
+      '--order',
+      '11.1',
+      '--description',
+      'a description thing',
+      '--output-path',
+      'generated',
+    ]);
+
+    const output = sfCommandStubs.log
+      .getCalls()
+      .map((call) => call.args[0] as string)
+      .join('\n');
+    expect(output).to.include('RelatedDomainBindingSObjectAlternate__c (nil)');
+    expect(output).to.include('ExecuteAsynchronous__c=false');
+    expect(output).to.include('Description__c');
+    expect(output).to.not.include('**c');
+    expect(output).to.not.include('\\_\\_c');
     await rm(projectDir, { recursive: true, force: true });
   });
 
