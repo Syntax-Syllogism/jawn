@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Corrected escaping in messages
-- Corrected markdown escaping for custom field names
+- Escaping in messages
+- Markdown escaping of custom field names
 
 ## [0.4.0] - 2026-06-26
 
