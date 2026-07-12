@@ -1,8 +1,25 @@
 import type { Connection } from '@salesforce/core';
-import { UserAccessError, type AccessTargetType, type ValidatedAccessTarget } from './types.js';
+import { esc, queryAll } from './soql.js';
+import { UserAccessError, type ValidatedAccessTarget } from './types.js';
 
 type FieldDescribe = { name: string };
 type SObjectDescribe = { name: string; fields: FieldDescribe[] };
+
+type SetupEntityDefinition = {
+  objectName: string;
+  nameField: 'Name' | 'DeveloperName';
+  notFoundCode: 'errorApexClassNotFound' | 'errorVisualforcePageNotFound' | 'errorCustomPermissionNotFound';
+};
+
+const setupEntityDefinitions: Record<string, SetupEntityDefinition> = {
+  'apex-class': { objectName: 'ApexClass', nameField: 'Name', notFoundCode: 'errorApexClassNotFound' },
+  'vf-page': { objectName: 'ApexPage', nameField: 'Name', notFoundCode: 'errorVisualforcePageNotFound' },
+  'custom-permission': {
+    objectName: 'CustomPermission',
+    nameField: 'DeveloperName',
+    notFoundCode: 'errorCustomPermissionNotFound',
+  },
+};
 
 const describeObject = async (conn: Connection, sobjectType: string): Promise<SObjectDescribe> => {
   try {
@@ -41,12 +58,34 @@ export const validateFieldTarget = async (conn: Connection, target: string): Pro
   };
 };
 
-export const validateTargetByType = async (
+export const validateSetupEntityTarget = async (
   conn: Connection,
-  type: AccessTargetType,
+  type: 'apex-class' | 'vf-page' | 'custom-permission',
   target: string
 ): Promise<ValidatedAccessTarget> => {
-  if (type === 'field') return validateFieldTarget(conn, target);
-  if (type === 'object') return validateObjectTarget(conn, target);
-  throw new UserAccessError('errorUnsupportedAccessType', [type]);
+  const trimmed = target.trim();
+  if (!trimmed) throw new UserAccessError('errorInvalidTarget', [target]);
+  const definition = setupEntityDefinitions[type];
+  const rows = await queryAll<{ Id: string; Name?: string; DeveloperName?: string }>(
+    conn,
+    `SELECT Id, ${definition.nameField} FROM ${definition.objectName} WHERE ${definition.nameField} = '${esc(trimmed)}' LIMIT 1`
+  );
+  const row = rows[0];
+  if (!row) throw new UserAccessError(definition.notFoundCode, [trimmed]);
+  return {
+    type,
+    targetName: row[definition.nameField] ?? trimmed,
+    setupEntityId: row.Id,
+  };
+};
+
+export const validateTabTarget = async (conn: Connection, target: string): Promise<ValidatedAccessTarget> => {
+  const trimmed = target.trim();
+  if (!trimmed) throw new UserAccessError('errorInvalidTarget', [target]);
+  const rows = await queryAll<{ DurableId?: string; Name?: string }>(
+    conn,
+    `SELECT DurableId, Name FROM TabDefinition WHERE DurableId = '${esc(trimmed)}' LIMIT 1`
+  );
+  if (!rows[0]) throw new UserAccessError('errorTabNotFound', [trimmed]);
+  return { type: 'tab', targetName: rows[0].DurableId ?? trimmed };
 };

@@ -2,6 +2,8 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { fieldResolver } from '../../src/userAccess/resolvers/field.js';
 import { objectResolver } from '../../src/userAccess/resolvers/object.js';
+import { apexClassResolver, customPermissionResolver, vfPageResolver } from '../../src/userAccess/resolvers/setupEntity.js';
+import { tabResolver } from '../../src/userAccess/resolvers/tab.js';
 import type { ValidatedAccessTarget } from '../../src/userAccess/types.js';
 
 type QueryPage = { records: unknown[]; done: boolean; nextRecordsUrl?: string };
@@ -14,6 +16,101 @@ const createConn = (queryHandler: (soql: string) => QueryPage, more: Record<stri
   } as never);
 
 describe('userAccess resolvers', () => {
+  it('resolves SetupEntityAccess grants to profiles, permission sets, and PSGs', async () => {
+    const conn = createConn((soql) => {
+      if (soql.includes('FROM ApexClass')) return { done: true, records: [{ Id: '01pClass', Name: 'MyClass' }] };
+      if (soql.includes('FROM SetupEntityAccess')) {
+        return {
+          done: true,
+          records: [
+            {
+              ParentId: '0PSProfile',
+              Parent: { Id: '0PSProfile', Name: 'Sales Profile', IsOwnedByProfile: true, ProfileId: '00e1', Profile: { Name: 'Sales User' }, Type: 'Regular' },
+            },
+            { ParentId: '0PSDirect', Parent: { Id: '0PSDirect', Name: 'Direct Class Access', IsOwnedByProfile: false, Type: 'Regular' } },
+            { ParentId: '0PSGroupMember', Parent: { Id: '0PSGroupMember', Name: 'Group Class Access', IsOwnedByProfile: false, Type: 'Regular' } },
+          ],
+        };
+      }
+      if (soql.includes('FROM PermissionSetGroupComponent') && soql.includes('PermissionSetId IN')) {
+        return { done: true, records: [{ PermissionSetGroupId: '0PGClass', PermissionSetId: '0PSGroupMember', PermissionSetGroup: { MasterLabel: 'Class PSG' } }] };
+      }
+      if (soql.includes('FROM PermissionSetAssignment')) {
+        return {
+          done: true,
+          records: [
+            { Id: '0PAProfile', AssigneeId: '005Profile', Assignee: { Name: 'Profile User', Username: 'profile@example.com', IsActive: true }, PermissionSetId: '0PSProfile' },
+            { Id: '0PADirect', AssigneeId: '005Direct', Assignee: { Name: 'Direct User', Username: 'direct@example.com', IsActive: true }, PermissionSetId: '0PSDirect' },
+            { Id: '0PAInactive', AssigneeId: '005Inactive', Assignee: { Name: 'Inactive User', Username: 'inactive@example.com', IsActive: false }, PermissionSetId: '0PSDirect' },
+            { Id: '0PAPsg', AssigneeId: '005Psg', Assignee: { Name: 'PSG User', Username: 'psg@example.com', IsActive: true }, PermissionSetGroupId: '0PGClass', PermissionSetGroup: { MasterLabel: 'Class PSG' } },
+          ],
+        };
+      }
+      return { done: true, records: [] };
+    });
+    const result = await apexClassResolver.resolve(conn, await apexClassResolver.validateTarget(conn, 'MyClass'));
+    expect(result.rows.map((row) => row.assignmentType)).to.deep.equal(['Profile', 'PermissionSet', 'PermissionSetGroup']);
+    expect(result.rows.map((row) => row.userId)).to.not.include('005Inactive');
+    expect(result.rows.every((row) => row.access).valueOf()).to.equal(true);
+  });
+
+  it('validates each SetupEntityAccess target with a specific not-found error', async () => {
+    const conn = createConn(() => ({ done: true, records: [] }));
+    for (const [resolver, code] of [
+      [apexClassResolver, 'errorApexClassNotFound'],
+      [vfPageResolver, 'errorVisualforcePageNotFound'],
+      [customPermissionResolver, 'errorCustomPermissionNotFound'],
+    ] as const) {
+      let caught: unknown;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await resolver.validateTarget(conn, 'Missing');
+      } catch (error) {
+        caught = error;
+      }
+      expect((caught as { code: string }).code).to.equal(code);
+    }
+  });
+
+  it('maps tab visibility and warns that profile tab visibility is excluded', async () => {
+    const target = await tabResolver.validateTarget(
+      createConn((soql) =>
+        soql.includes("FROM TabDefinition WHERE DurableId = 'Account'")
+          ? { done: true, records: [{ DurableId: 'Account', Name: 'standard-Account' }] }
+          : { done: true, records: [] }
+      ),
+      'Account'
+    );
+    expect(target.targetName).to.equal('Account');
+    const conn = createConn((soql) => {
+      if (soql.includes('FROM PermissionSetTabSetting')) {
+        return { done: true, records: [{ ParentId: '0PSTab', Visibility: 'DefaultOn', Parent: { Id: '0PSTab', Name: 'Tab Access', IsOwnedByProfile: false, Type: 'Regular' } }] };
+      }
+      if (soql.includes('FROM PermissionSetAssignment')) {
+        return { done: true, records: [{ Id: '0PATab', AssigneeId: '005Tab', Assignee: { Name: 'Tab User', Username: 'tab@example.com', IsActive: true }, PermissionSetId: '0PSTab' }] };
+      }
+      return { done: true, records: [] };
+    });
+    const result = await tabResolver.resolve(conn, target);
+    const tabQuery = (conn as unknown as { query: sinon.SinonStub }).query
+      .getCalls()
+      .map((call) => call.args[0] as string)
+      .find((query) => query.includes('FROM PermissionSetTabSetting'));
+    expect(tabQuery).to.include("WHERE Name = 'Account'");
+    expect(result.rows[0].access).to.deep.equal({ kind: 'tab', visibility: 'DefaultOn' });
+    expect(result.warnings[0]).to.include('Profile-level tab visibility');
+  });
+
+  it('returns a specific error when a tab target does not exist', async () => {
+    let caught: unknown;
+    try {
+      await tabResolver.validateTarget(createConn(() => ({ done: true, records: [] })), 'MissingTab');
+    } catch (error) {
+      caught = error;
+    }
+    expect((caught as { code: string }).code).to.equal('errorTabNotFound');
+  });
+
   it('field resolver keeps standalone access when PSG path is muted', async () => {
     const target: ValidatedAccessTarget = {
       type: 'field',
@@ -169,7 +266,8 @@ describe('userAccess resolvers', () => {
     });
     const result = await objectResolver.resolve(conn, target);
     expect(result.rows.length).to.equal(1);
-    const access = result.rows[0].access as Record<string, boolean>;
+    const access = result.rows[0].access;
+    if (access.kind !== 'object') throw new Error('Expected object access');
     expect(access.read).to.equal(true);
     expect(access.create).to.equal(false);
     expect(access.edit).to.equal(true);

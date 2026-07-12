@@ -626,14 +626,27 @@ describe('jawn user provision command', () => {
       if (soql.includes('FROM GroupMember')) {
         return {
           records: [
-            { Id: '0GMpub', GroupId: '00Gold000000001AAA', Group: { Type: 'Regular' } },
-            { Id: '0GMqueue', GroupId: '00Gqueue0000001AAA', Group: { Type: 'Queue' } },
+            {
+              Id: '0GMpub',
+              GroupId: '00Gold000000001AAA',
+              UserOrGroupId: '005xx0000000002AAA',
+              Group: { Type: 'Regular' },
+            },
+            {
+              Id: '0GMqueue',
+              GroupId: '00Gqueue0000001AAA',
+              UserOrGroupId: '005xx0000000002AAA',
+              Group: { Type: 'Queue' },
+            },
           ],
         };
       }
       if (soql.includes('FROM UserLogin')) return { records: [] };
       return { records: [] };
     });
+    fakeConn.sobjectMap.User.update.callsFake(async (items: Array<{ Id: string }>) =>
+      items.map((item) => ({ success: true, id: item.Id, errors: [] }))
+    );
     sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
       flags: {
         'target-org': { getConnection: () => fakeConn },
@@ -653,6 +666,107 @@ describe('jawn user provision command', () => {
       .flat();
     expect(deletes).to.include('0GMpub');
     expect(deletes).to.not.include('0GMqueue');
+  });
+
+  it('does not remove profile-owned or permission-set-group-backed permission sets during permission-set sync', async () => {
+    const fakeConn = createFakeConnection();
+    const dir = mkdtempSync(join(tmpdir(), 'jawn-provision-test-'));
+    const usersPath = join(dir, 'users-sync-psa.json');
+    const personasPath = join(dir, 'personas-sync-psa.json');
+    writeFileSync(
+      usersPath,
+      JSON.stringify({
+        users: [
+          {
+            Username: 'existing.user@example.test',
+            FederationIdentifier: 'A003',
+            personas: ['default'],
+            LastName: 'User',
+            Alias: 'euser',
+            TimeZoneSidKey: 'America/Los_Angeles',
+            LocaleSidKey: 'en_US',
+            EmailEncodingKey: 'UTF-8',
+            LanguageLocaleKey: 'en_US',
+          },
+        ],
+      })
+    );
+    writeFileSync(
+      personasPath,
+      JSON.stringify({
+        personas: {
+          default: { profile: 'Admin', permissionSetMode: 'sync', permissionSets: ['KeepPerm'] },
+        },
+      })
+    );
+    fakeConn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM Profile')) return { records: [{ Id: '00exx0000000001AAA', Name: 'Admin' }] };
+      if (soql.includes('SELECT Id, IsActive, FederationIdentifier FROM User'))
+        return { records: [{ Id: '005xx0000000003AAA', IsActive: true, FederationIdentifier: 'A003' }] };
+      if (soql.includes("FROM PermissionSet WHERE Name IN ('KeepPerm')"))
+        return { records: [{ Id: '0PSkeep00000001AAA', Name: 'KeepPerm' }] };
+      if (soql.includes('FROM PermissionSetAssignment'))
+        return {
+          records: [
+            {
+              Id: '0PaKeep',
+              AssigneeId: '005xx0000000003AAA',
+              PermissionSetId: '0PSkeep00000001AAA',
+              PermissionSetGroupId: null,
+              PermissionSet: { IsOwnedByProfile: false },
+            },
+            {
+              Id: '0PaProfileOwned',
+              AssigneeId: '005xx0000000003AAA',
+              PermissionSetId: '0PSprofileOwned',
+              PermissionSetGroupId: null,
+              PermissionSet: { IsOwnedByProfile: true },
+            },
+            {
+              Id: '0PaPsgBacked',
+              AssigneeId: '005xx0000000003AAA',
+              PermissionSetId: '0PSpsgBacked',
+              PermissionSetGroupId: '0PGsourceGroup',
+              PermissionSet: { IsOwnedByProfile: false },
+            },
+            {
+              Id: '0PaExtra',
+              AssigneeId: '005xx0000000003AAA',
+              PermissionSetId: '0PSextra',
+              PermissionSetGroupId: null,
+              PermissionSet: { IsOwnedByProfile: false },
+            },
+          ],
+        };
+      if (soql.includes('FROM GroupMember')) return { records: [] };
+      return { records: [] };
+    });
+    fakeConn.sobjectMap.User.update.callsFake(async (items: Array<{ Id: string }>) =>
+      items.map((item) => ({ success: true, id: item.Id, errors: [] }))
+    );
+    sinon.stub(UserProvision.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => fakeConn },
+        'users-def': usersPath,
+        'personas-def': personasPath,
+        'external-id': 'FederationIdentifier',
+        'no-prompt': true,
+        'dry-run': false,
+        'api-version': undefined,
+      },
+    } as never);
+
+    await UserProvision.run(['--json']);
+    const permissionSetAssignment = fakeConn.sobject.withArgs('PermissionSetAssignment').returnValues[0] as {
+      delete: sinon.SinonStub;
+    };
+    const deletes = permissionSetAssignment.delete
+      .getCalls()
+      .map((call) => call.args[0] as string[])
+      .flat();
+    expect(deletes).to.include('0PaExtra');
+    expect(deletes).to.not.include('0PaProfileOwned');
+    expect(deletes).to.not.include('0PaPsgBacked');
   });
 
   it('fails duplicate external-id matches per user', async () => {

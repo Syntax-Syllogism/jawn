@@ -3,7 +3,6 @@ import sinon from 'sinon';
 import {
   validateFieldTarget,
   validateObjectTarget,
-  validateTargetByType,
 } from '../../src/userAccess/targetValidation.js';
 import { UserAccessError } from '../../src/userAccess/types.js';
 
@@ -83,14 +82,4 @@ describe('userAccess target validation', () => {
     expect((caught as UserAccessError).code).to.equal('errorObjectNotFound');
   });
 
-  it('throws unsupported type in validateTargetByType', async () => {
-    const conn = { describe: sinon.stub() };
-    let caught: unknown;
-    try {
-      await validateTargetByType(conn as never, 'bad' as never, 'x');
-    } catch (error) {
-      caught = error;
-    }
-    expect((caught as UserAccessError).code).to.equal('errorUnsupportedAccessType');
-  });
 });

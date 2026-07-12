@@ -15,6 +15,24 @@ const createConnection = (): {
   })),
   queryMore: sinon.stub().resolves({ records: [], done: true }),
   query: sinon.stub().callsFake(async (soql: string) => {
+    if (soql.includes('FROM ApexClass')) return { done: true, records: [{ Id: '01p1', Name: 'MyController' }] };
+    if (soql.includes('FROM ApexPage')) return { done: true, records: [{ Id: '01pPage', Name: 'MyPage' }] };
+    if (soql.includes('FROM CustomPermission')) {
+      return { done: true, records: [{ Id: '0CP1', DeveloperName: 'Can_Edit_Accounts' }] };
+    }
+    if (soql.includes('FROM TabDefinition')) return { done: true, records: [{ DurableId: 'Account', Name: 'standard-Account' }] };
+    if (soql.includes('FROM SetupEntityAccess')) {
+      return {
+        done: true,
+        records: [{ ParentId: '0PS1', Parent: { Id: '0PS1', Name: 'Setup Access', IsOwnedByProfile: false, Type: 'Regular' } }],
+      };
+    }
+    if (soql.includes('FROM PermissionSetTabSetting')) {
+      return {
+        done: true,
+        records: [{ ParentId: '0PS1', Visibility: 'DefaultOn', Parent: { Id: '0PS1', Name: 'Tab Access', IsOwnedByProfile: false, Type: 'Regular' } }],
+      };
+    }
     if (soql.includes('FROM ObjectPermissions')) {
       return {
         done: true,
@@ -75,6 +93,82 @@ describe('jawn user access command', () => {
   afterEach(() => {
     sinon.restore();
     $$.restore();
+  });
+
+  it('supports apex-class human output through the command', async () => {
+    const conn = createConnection();
+    conn.query.callsFake(async (soql: string) => {
+      if (soql.includes('FROM ApexClass')) return { done: true, records: [{ Id: '01p1', Name: 'MyController' }] };
+      if (soql.includes('FROM SetupEntityAccess')) {
+        return {
+          done: true,
+          records: [{ ParentId: '0PS1', Parent: { Id: '0PS1', Name: 'Controller Access', IsOwnedByProfile: false, Type: 'Regular' } }],
+        };
+      }
+      if (soql.includes('FROM PermissionSetAssignment')) {
+        return {
+          done: true,
+          records: [{ Id: '0PA1', AssigneeId: '0051', Assignee: { Name: 'Jane Smith', Username: 'jane@example.com', IsActive: true }, PermissionSetId: '0PS1' }],
+        };
+      }
+      return { done: true, records: [] };
+    });
+    sinon.stub(UserAccess.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: {
+        'target-org': { getConnection: () => conn },
+        type: 'apex-class',
+        target: 'MyController',
+        output: 'human',
+        'api-version': undefined,
+      },
+    } as never);
+    await UserAccess.run([]);
+    const output = sfCommandStubs.log.getCalls().map((call) => call.args[0] as string).join('\n');
+    expect(output).to.include('Apex Class: MyController');
+    expect(output).to.include('Enabled');
+  });
+
+  it('serializes apex-class access in csv output', async () => {
+    const conn = createConnection();
+    sinon.stub(UserAccess.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: { 'target-org': { getConnection: () => conn }, type: 'apex-class', target: 'MyController', output: 'csv', 'api-version': undefined },
+    } as never);
+    await UserAccess.run([]);
+    const output = sfCommandStubs.log.firstCall.args[0] as string;
+    expect(output.split('\n')[0]).to.include(',enabled');
+    expect(output).to.include('true');
+  });
+
+  it('serializes vf-page access in json output', async () => {
+    const conn = createConnection();
+    sinon.stub(UserAccess.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: { 'target-org': { getConnection: () => conn }, type: 'vf-page', target: 'MyPage', output: 'json', 'api-version': undefined },
+    } as never);
+    const result = await UserAccess.run([]);
+    expect(result.targetType).to.equal('vf-page');
+    expect(result.rows[0].access).to.deep.equal({ kind: 'enabled', enabled: true });
+    expect(sfCommandStubs.log.firstCall.args[0] as string).to.include('"enabled": true');
+  });
+
+  it('serializes custom-permission access in csv output', async () => {
+    const conn = createConnection();
+    sinon.stub(UserAccess.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: { 'target-org': { getConnection: () => conn }, type: 'custom-permission', target: 'Can_Edit_Accounts', output: 'csv', 'api-version': undefined },
+    } as never);
+    await UserAccess.run([]);
+    expect((sfCommandStubs.log.firstCall.args[0] as string).split('\n')[0]).to.include(',enabled');
+  });
+
+  it('renders tab access in human output', async () => {
+    const conn = createConnection();
+    sinon.stub(UserAccess.prototype as unknown as Record<string, unknown>, 'parse').resolves({
+      flags: { 'target-org': { getConnection: () => conn }, type: 'tab', target: 'Account', output: 'human', 'api-version': undefined },
+    } as never);
+    await UserAccess.run([]);
+    const output = sfCommandStubs.log.firstCall.args[0] as string;
+    expect(output).to.include('Tab: Account');
+    expect(output).to.include('Visibility');
+    expect(output).to.include('DefaultOn');
   });
 
   it('defaults to human output when output flag is omitted', async () => {
@@ -144,7 +238,7 @@ describe('jawn user access command', () => {
     sinon.stub(UserAccess.prototype as unknown as Record<string, unknown>, 'parse').resolves({
       flags: {
         'target-org': { getConnection: () => conn },
-        type: 'apex-class',
+        type: 'not-a-type',
         target: 'MyClass',
         output: 'human',
         'api-version': undefined,

@@ -1,6 +1,6 @@
 import { Messages, SfError } from '@salesforce/core';
 import { Flags, SfCommand } from '@salesforce/sf-plugins-core';
-import { renderFieldTable, renderObjectTable, serializeCsv } from '../../../userAccess/output.js';
+import { renderEnabledTable, renderFieldTable, renderObjectTable, renderTabTable, serializeCsv } from '../../../userAccess/output.js';
 import { getResolver } from '../../../userAccess/resolvers/index.js';
 import type { AccessTargetType, UserAccessResult, UserAccessRow } from '../../../userAccess/types.js';
 import { UserAccessError } from '../../../userAccess/types.js';
@@ -18,10 +18,19 @@ const sortedForHuman = (rows: UserAccessRow[]): UserAccessRow[] =>
       (a.viaPermissionSetName ?? '').localeCompare(b.viaPermissionSetName ?? '')
   );
 
+const targetLabels: Record<AccessTargetType, string> = {
+  field: 'Field',
+  object: 'Object',
+  'apex-class': 'Apex Class',
+  'vf-page': 'Visualforce Page',
+  'custom-permission': 'Custom Permission',
+  tab: 'Tab',
+};
+
 const renderHuman = (result: UserAccessResult): string => {
   const sortedRows = sortedForHuman(result.rows);
   const lines = [
-    `${result.targetType === 'field' ? 'Field' : 'Object'}: ${result.targetName}`,
+    `${targetLabels[result.targetType]}: ${result.targetName}`,
     `Active users with access: ${result.stats.totalActiveUsersWithAccess}`,
     `Profiles: ${result.stats.profileGrants} | Permission Sets: ${result.stats.permissionSetGrants} | Permission Set Groups: ${result.stats.permissionSetGroupGrants}`,
   ];
@@ -31,7 +40,10 @@ const renderHuman = (result: UserAccessResult): string => {
   }
   if (sortedRows.length > 0) {
     lines.push('');
-    lines.push(result.targetType === 'field' ? renderFieldTable(sortedRows) : renderObjectTable(sortedRows));
+    if (result.targetType === 'field') lines.push(renderFieldTable(sortedRows));
+    else if (result.targetType === 'object') lines.push(renderObjectTable(sortedRows));
+    else if (result.targetType === 'tab') lines.push(renderTabTable(sortedRows));
+    else lines.push(renderEnabledTable(sortedRows));
   } else if (result.warnings.length === 0) {
     lines.push('');
     lines.push(messages.getMessage('info.noResults'));
@@ -48,7 +60,7 @@ export default class UserAccess extends SfCommand<UserAccessResult> {
     'target-org': Flags.requiredOrg({ summary: messages.getMessage('flags.target-org.summary') }),
     type: Flags.string({
       required: true,
-      options: ['field', 'object'] as const,
+      options: ['field', 'object', 'apex-class', 'vf-page', 'custom-permission', 'tab'] as const,
       summary: messages.getMessage('flags.type.summary'),
     }),
     target: Flags.string({ required: true, summary: messages.getMessage('flags.target.summary') }),

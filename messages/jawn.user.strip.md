@@ -58,6 +58,10 @@ Keep public group memberships.
 
 Keep queue memberships.
 
+# flags.snapshot.summary
+
+Write a portable user snapshot JSON file before stripping access, including during dry-run.
+
 # flags.api-version.summary
 
 Override the api version used for the org connection.
@@ -202,6 +206,10 @@ Skipped queue removals.
 
 Skipped %s profile-owned permission set assignments.
 
+# snapshotWritten
+
+Wrote snapshot.
+
 # info.summary
 
 Processed %s user%s: %s changed, %s unchanged, %s failed.
@@ -219,3 +227,7 @@ Processed %s user%s: %s changed, %s unchanged, %s failed.
 - Keep permission set licenses while stripping everything else:
 
   <%= config.bin %> <%= command.id %> --users-def config/user-def.json --keep-licenses --target-org myOrg --dry-run
+
+- Capture a restorable snapshot before stripping:
+
+  <%= config.bin %> <%= command.id %> --user username:someone@example.com --snapshot snapshots/user.json --target-org myOrg --no-prompt

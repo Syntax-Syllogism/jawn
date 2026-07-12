@@ -1,14 +1,43 @@
 import { expect } from 'chai';
 import {
+  enabledCsvColumns,
   fieldCsvColumns,
   objectCsvColumns,
   renderFieldTable,
+  renderEnabledTable,
   renderObjectTable,
+  renderTabTable,
   serializeCsv,
+  tabCsvColumns,
 } from '../../src/userAccess/output.js';
 import type { UserAccessRow } from '../../src/userAccess/types.js';
 
 describe('userAccess output', () => {
+  it('serializes enabled and tab columns', () => {
+    expect(enabledCsvColumns()).to.deep.equal([
+      'userId',
+      'userName',
+      'username',
+      'assignmentType',
+      'sourceId',
+      'sourceName',
+      'viaPermissionSetId',
+      'viaPermissionSetName',
+      'enabled',
+    ]);
+    expect(tabCsvColumns()).to.deep.equal([
+      'userId',
+      'userName',
+      'username',
+      'assignmentType',
+      'sourceId',
+      'sourceName',
+      'viaPermissionSetId',
+      'viaPermissionSetName',
+      'visibility',
+    ]);
+  });
+
   it('serializes field csv columns in order', () => {
     expect(fieldCsvColumns()).to.deep.equal([
       'userId',
@@ -56,7 +85,7 @@ describe('userAccess output', () => {
         sourceName: 'Line\nBreak',
         viaPermissionSetId: undefined,
         viaPermissionSetName: undefined,
-        access: { read: true, edit: false },
+        access: { kind: 'field', read: true, edit: false },
       },
     ];
     const csv = serializeCsv(rows, fieldCsvColumns());
@@ -75,7 +104,7 @@ describe('userAccess output', () => {
         assignmentType: 'Profile',
         sourceId: '00e1',
         sourceName: 'Sales User',
-        access: { read: true, edit: false },
+        access: { kind: 'field', read: true, edit: false },
       },
       {
         userId: '005yy',
@@ -88,7 +117,7 @@ describe('userAccess output', () => {
         sourceName: 'Sales Ops',
         viaPermissionSetId: '0PS1',
         viaPermissionSetName: 'Account Editors',
-        access: { read: true, edit: true },
+        access: { kind: 'field', read: true, edit: true },
       },
     ];
     const rendered = renderFieldTable(rows);
@@ -107,12 +136,37 @@ describe('userAccess output', () => {
         assignmentType: 'PermissionSetGroup',
         sourceId: '0PG2',
         sourceName: 'Ops',
-        access: { read: true, create: false, edit: true, delete: false, viewAll: false, modifyAll: false },
+        access: { kind: 'object', read: true, create: false, edit: true, delete: false, viewAll: false, modifyAll: false },
       },
     ];
     const rendered = renderObjectTable(rows);
     expect(rendered).to.include('Y');
     expect(rendered).to.include('N');
     expect(rendered).to.include('PSG: Ops');
+  });
+
+  it('renders enabled and tab tables and serializes access values', () => {
+    const enabledRow: UserAccessRow = {
+      userId: '005e',
+      userName: 'Ed',
+      username: 'ed@example.com',
+      targetType: 'apex-class',
+      targetName: 'MyClass',
+      assignmentType: 'PermissionSet',
+      sourceId: '0PSe',
+      sourceName: 'Class Access',
+      access: { kind: 'enabled', enabled: true },
+    };
+    expect(renderEnabledTable([enabledRow])).to.include('yes');
+    expect(serializeCsv([enabledRow], enabledCsvColumns())).to.include('true');
+
+    const tabRow: UserAccessRow = {
+      ...enabledRow,
+      targetType: 'tab',
+      targetName: 'Account',
+      access: { kind: 'tab', visibility: 'DefaultOn' },
+    };
+    expect(renderTabTable([tabRow])).to.include('DefaultOn');
+    expect(serializeCsv([tabRow], tabCsvColumns())).to.include('DefaultOn');
   });
 });

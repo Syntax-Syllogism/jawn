@@ -12,11 +12,11 @@ Target org username or alias.
 
 # flags.type.summary
 
-Target type to audit. Phase 1 supports field and object.
+Target type to audit: field, object, apex-class, vf-page, custom-permission, or tab.
 
 # flags.target.summary
 
-Target API name. Use Object.Field for field type and Object for object type.
+Target API name. Use Object.Field for field, Object for object, Apex class name for apex-class, Visualforce page name for vf-page, custom permission DeveloperName for custom-permission, or tab API name for tab.
 
 # flags.output.summary
 
@@ -44,7 +44,23 @@ Object not found: %s.
 
 # errorFieldNotFound
 
-Field %2$s was not found on object %1$s.
+Object %s does not have field %s.
+
+# errorApexClassNotFound
+
+Apex class not found: %s.
+
+# errorVisualforcePageNotFound
+
+Visualforce page not found: %s.
+
+# errorCustomPermissionNotFound
+
+Custom permission not found: %s.
+
+# errorTabNotFound
+
+Tab not found: %s.
 
 # errorAccessQueryFailed
 
@@ -67,3 +83,19 @@ No active users matched this target.
 - Field access in json output:
 
   <%= config.bin %> <%= command.id %> --type field --target Account.CustomField__c --target-org myOrg --output json
+
+- Apex class access in human output:
+
+  <%= config.bin %> <%= command.id %> --type apex-class --target MyController --target-org myOrg
+
+- Visualforce page access in csv output:
+
+  <%= config.bin %> <%= command.id %> --type vf-page --target MyPage --target-org myOrg --output csv
+
+- Custom permission access in json output:
+
+  <%= config.bin %> <%= command.id %> --type custom-permission --target Can_Edit_Accounts --target-org myOrg --output json
+
+- Tab visibility in human output:
+
+  <%= config.bin %> <%= command.id %> --type tab --target Account --target-org myOrg

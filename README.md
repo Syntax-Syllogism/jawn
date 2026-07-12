@@ -66,8 +66,11 @@ sf plugins
 * [`sf jawn aep generate service`](#sf-jawn-aep-generate-service)
 * [`sf jawn aep generate unitofwork`](#sf-jawn-aep-generate-unitofwork)
 * [`sf jawn user access`](#sf-jawn-user-access)
+* [`sf jawn user diff`](#sf-jawn-user-diff)
 * [`sf jawn user freeze`](#sf-jawn-user-freeze)
 * [`sf jawn user provision`](#sf-jawn-user-provision)
+* [`sf jawn user restore`](#sf-jawn-user-restore)
+* [`sf jawn user snapshot`](#sf-jawn-user-snapshot)
 * [`sf jawn user strip`](#sf-jawn-user-strip)
 * [`sf jawn user unfreeze`](#sf-jawn-user-unfreeze)
 
@@ -115,7 +118,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate.ts)_
+_See code: [src/commands/jawn/aep/generate.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate.ts)_
 
 ## `sf jawn aep generate action`
 
@@ -160,7 +163,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/action.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/action.ts)_
+_See code: [src/commands/jawn/aep/generate/action.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/action.ts)_
 
 ## `sf jawn aep generate criteria`
 
@@ -205,7 +208,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/criteria.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/criteria.ts)_
+_See code: [src/commands/jawn/aep/generate/criteria.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/criteria.ts)_
 
 ## `sf jawn aep generate domain`
 
@@ -246,7 +249,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/domain.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/domain.ts)_
+_See code: [src/commands/jawn/aep/generate/domain.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/domain.ts)_
 
 ## `sf jawn aep generate selector`
 
@@ -291,7 +294,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/selector.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/selector.ts)_
+_See code: [src/commands/jawn/aep/generate/selector.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/selector.ts)_
 
 ## `sf jawn aep generate selector field-injection`
 
@@ -326,7 +329,7 @@ EXAMPLES
     $ sf jawn aep generate selector field-injection -s Account --fields Name,Industry
 ```
 
-_See code: [src/commands/jawn/aep/generate/selector/field-injection.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/selector/field-injection.ts)_
+_See code: [src/commands/jawn/aep/generate/selector/field-injection.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/selector/field-injection.ts)_
 
 ## `sf jawn aep generate selector method`
 
@@ -367,7 +370,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/selector/method.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/selector/method.ts)_
+_See code: [src/commands/jawn/aep/generate/selector/method.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/selector/method.ts)_
 
 ## `sf jawn aep generate service`
 
@@ -408,7 +411,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/service.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/service.ts)_
+_See code: [src/commands/jawn/aep/generate/service.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/service.ts)_
 
 ## `sf jawn aep generate unitofwork`
 
@@ -450,7 +453,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/aep/generate/unitofwork.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/aep/generate/unitofwork.ts)_
+_See code: [src/commands/jawn/aep/generate/unitofwork.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/aep/generate/unitofwork.ts)_
 
 ## `sf jawn user access`
 
@@ -458,17 +461,20 @@ Audit active-user access for a permission target.
 
 ```
 USAGE
-  $ sf jawn user access -o <value> --type field|object --target <value> [--json] [--flags-dir <value>] [--output
-    human|csv|json] [--api-version <value>]
+  $ sf jawn user access -o <value> --type field|object|apex-class|vf-page|custom-permission|tab --target <value>
+    [--json] [--flags-dir <value>] [--output human|csv|json] [--api-version <value>]
 
 FLAGS
   -o, --target-org=<value>   (required) Target org username or alias.
       --api-version=<value>  Override the api version used for the org connection.
       --output=<option>      [default: human] Output format: human, csv, or json. Defaults to human.
                              <options: human|csv|json>
-      --target=<value>       (required) Target API name. Use Object.Field for field type and Object for object type.
-      --type=<option>        (required) Target type to audit. Phase 1 supports field and object.
-                             <options: field|object>
+      --target=<value>       (required) Target API name. Use Object.Field for field, Object for object, Apex class name
+                             for apex-class, Visualforce page name for vf-page, custom permission DeveloperName for
+                             custom-permission, or tab API name for tab.
+      --type=<option>        (required) Target type to audit: field, object, apex-class, vf-page, custom-permission, or
+                             tab.
+                             <options: field|object|apex-class|vf-page|custom-permission|tab>
 
 GLOBAL FLAGS
   --flags-dir=<value>  Import flag values from a directory.
@@ -493,13 +499,80 @@ EXAMPLES
 
     $ sf jawn user access --type field --target Account.CustomField__c --target-org myOrg --output json
 
+  Apex class access in human output:
+
+    $ sf jawn user access --type apex-class --target MyController --target-org myOrg
+
+  Visualforce page access in csv output:
+
+    $ sf jawn user access --type vf-page --target MyPage --target-org myOrg --output csv
+
+  Custom permission access in json output:
+
+    $ sf jawn user access --type custom-permission --target Can_Edit_Accounts --target-org myOrg --output json
+
+  Tab visibility in human output:
+
+    $ sf jawn user access --type tab --target Account --target-org myOrg
+
 FLAG DESCRIPTIONS
   --api-version=<value>  Override the api version used for the org connection.
 
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/user/access.ts)_
+_See code: [src/commands/jawn/user/access.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/access.ts)_
+
+## `sf jawn user diff`
+
+Compare user assignments against intended persona state or another user.
+
+```
+USAGE
+  $ sf jawn user diff -o <value> [--json] [--flags-dir <value>] [--user <value> --against <value>] [--users-def
+    <value> --personas-def <value>] [--external-id <value>] [--output human|csv|json] [--verbose] [--api-version
+    <value>]
+
+FLAGS
+  -o, --target-org=<value>    (required) Target org username or alias.
+      --against=<value>       Reference user to compare against using `field:value`.
+      --api-version=<value>   Override the api version used for the org connection.
+      --external-id=<value>   Default User field used to match entries in `--users-def`.
+      --output=<option>       [default: human] Output format when not using global `--json`.
+                              <options: human|csv|json>
+      --personas-def=<value>  Path to persona definition JSON file.
+      --user=<value>          Target user to compare using `field:value`.
+      --users-def=<value>     Path to user definition JSON file.
+      --verbose               Include assignments that are already present in both sides in human output.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Compare user assignments against intended persona state or another user.
+
+  Reports read-only drift across profile, role, permission sets, permission set groups, public groups, and queues
+  without applying changes.
+
+EXAMPLES
+  Compare users in a definition file against their personas:
+
+    $ sf jawn user diff --users-def config/user-def.json --personas-def config/persona-def.json --external-id ^
+      FederationIdentifier --target-org myOrg
+
+  Compare one user against another:
+
+    $ sf jawn user diff --user username:new@example.com --against username:template@example.com --target-org myOrg ^
+      --output csv
+
+FLAG DESCRIPTIONS
+  --api-version=<value>  Override the api version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/user/diff.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/diff.ts)_
 
 ## `sf jawn user freeze`
 
@@ -544,7 +617,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/freeze.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/user/freeze.ts)_
+_See code: [src/commands/jawn/user/freeze.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/freeze.ts)_
 
 ## `sf jawn user provision`
 
@@ -593,7 +666,95 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/user/provision.ts)_
+_See code: [src/commands/jawn/user/provision.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/provision.ts)_
+
+## `sf jawn user restore`
+
+Restore user assignment state from a snapshot file.
+
+```
+USAGE
+  $ sf jawn user restore -o <value> --snapshot <value> [--json] [--flags-dir <value>] [--no-prompt] [--dry-run]
+    [--api-version <value>]
+
+FLAGS
+  -o, --target-org=<value>   (required) Target org username or alias.
+      --api-version=<value>  Override the api version used for the org connection.
+      --dry-run              Validate and plan actions without any write operations.
+      --no-prompt            Skip confirmation prompts before write operations.
+      --snapshot=<value>     (required) Path to a user snapshot JSON file.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Restore user assignment state from a snapshot file.
+
+  Re-resolves users by the snapshot match key, reactivates and unfreezes them, and adds missing assignments without
+  removing existing access.
+
+EXAMPLES
+  Preview a restore:
+
+    $ sf jawn user restore --snapshot snapshots/user.json --dry-run --target-org myOrg
+
+  Restore without prompts:
+
+    $ sf jawn user restore --snapshot snapshots/user.json --target-org myOrg --no-prompt
+
+FLAG DESCRIPTIONS
+  --api-version=<value>  Override the api version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/user/restore.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/restore.ts)_
+
+## `sf jawn user snapshot`
+
+Capture user assignment state to a portable snapshot file.
+
+```
+USAGE
+  $ sf jawn user snapshot -o <value> [--json] [--flags-dir <value>] [--user <value>] [--users-def <value>]
+    [--external-id <value>] [--out <value>] [--api-version <value>]
+
+FLAGS
+  -o, --target-org=<value>   (required) Target org username or alias.
+      --api-version=<value>  Override the api version used for the org connection.
+      --external-id=<value>  Default User field used to match entries in `--users-def`.
+      --out=<value>          Path to write the snapshot JSON file.
+      --user=<value>         Target a single user using `field:value`.
+      --users-def=<value>    Path to a user definition JSON file.
+
+GLOBAL FLAGS
+  --flags-dir=<value>  Import flag values from a directory.
+  --json               Format output as json.
+
+DESCRIPTION
+  Capture user assignment state to a portable snapshot file.
+
+  Captures matching users' active/frozen state and access assignments using developer/API names so the snapshot can be
+  restored later.
+
+EXAMPLES
+  Snapshot a single user:
+
+    $ sf jawn user snapshot --user username:someone@example.com --out snapshots/user.json --target-org myOrg
+
+  Snapshot users from a definition file:
+
+    $ sf jawn user snapshot --users-def config/user-def.json --external-id FederationIdentifier --out ^
+      snapshots/users.json --target-org myOrg
+
+FLAG DESCRIPTIONS
+  --api-version=<value>  Override the api version used for the org connection.
+
+    Override the api version used for api requests made by this command
+```
+
+_See code: [src/commands/jawn/user/snapshot.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/snapshot.ts)_
 
 ## `sf jawn user strip`
 
@@ -603,7 +764,8 @@ Strip and deactivate one or more users.
 USAGE
   $ sf jawn user strip -o <value> [--json] [--flags-dir <value>] [--user <value>] [--users-def <value>]
     [--external-id <value>] [--no-prompt] [--dry-run] [--no-freeze] [--no-deactivate] [--keep-permsets]
-    [--keep-permset-groups] [--keep-licenses] [--keep-public-groups] [--keep-queues] [--api-version <value>]
+    [--keep-permset-groups] [--keep-licenses] [--keep-public-groups] [--keep-queues] [--snapshot <value>] [--api-version
+    <value>]
 
 FLAGS
   -o, --target-org=<value>   (required) Target org username or alias.
@@ -618,6 +780,7 @@ FLAGS
       --no-deactivate        Skip the final deactivation step.
       --no-freeze            Skip the initial freeze step.
       --no-prompt            Skip confirmation prompts before write operations.
+      --snapshot=<value>     Write a portable user snapshot JSON file before stripping access, including during dry-run.
       --user=<value>         Target a single user using `field:value`.
       --users-def=<value>    Path to a user definition JSON file.
 
@@ -645,13 +808,18 @@ EXAMPLES
 
     $ sf jawn user strip --users-def config/user-def.json --keep-licenses --target-org myOrg --dry-run
 
+  Capture a restorable snapshot before stripping:
+
+    $ sf jawn user strip --user username:someone@example.com --snapshot snapshots/user.json --target-org myOrg ^
+      --no-prompt
+
 FLAG DESCRIPTIONS
   --api-version=<value>  Override the api version used for the org connection.
 
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/strip.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/user/strip.ts)_
+_See code: [src/commands/jawn/user/strip.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/strip.ts)_
 
 ## `sf jawn user unfreeze`
 
@@ -696,7 +864,7 @@ FLAG DESCRIPTIONS
     Override the api version used for api requests made by this command
 ```
 
-_See code: [src/commands/jawn/user/unfreeze.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.4.1/src/commands/jawn/user/unfreeze.ts)_
+_See code: [src/commands/jawn/user/unfreeze.ts](https://github.com/Syntax-Syllogism/jawn/blob/v0.5.0/src/commands/jawn/user/unfreeze.ts)_
 <!-- commandsstop -->
 
 ### `user provision` - User and persona definition files

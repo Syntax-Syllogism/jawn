@@ -8,6 +8,7 @@ import {
   soqlIn,
   type SaveResult,
 } from '../userShared/sfUtils.js';
+import { loadAssignmentState } from '../userLifecycle/assignmentState.js';
 import {
   buildDefaultAlias,
   buildDefaultUsername,
@@ -16,32 +17,25 @@ import {
   deriveMyDomain,
   isSalesforceId,
   missingRequiredFieldsForInsert,
-  normalizeMode,
   PersonaDefinition,
   UserFieldMeta,
   validateAndCanonicalizeUsers,
   validateExternalIdFieldForFlag,
   validatePersonaModes,
 } from './planner.js';
+import {
+  computeAssignmentDeltaFromState,
+  hasAssignmentIntent,
+  toDmlPlan,
+  type AssignmentDmlPlan,
+  type ResolvedRefs,
+} from './assignmentPlan.js';
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
 const messages = Messages.loadMessages('@syntax-syllogism/jawn', 'jawn.user.provision');
 
 type JsonRecord = Record<string, unknown>;
-type ExistingUser = { Id: string; IsActive?: boolean };
-type ExistingAssignment = { Id: string; PermissionSetId?: string; PermissionSetGroupId?: string };
-type ExistingMembership = { Id: string; GroupId: string; GroupType?: string };
-type AssignmentPlan = { adds: string[]; removes: string[] };
-
-type ResolvedRefs = {
-  profilesByRef: Map<string, string>;
-  rolesByRef: Map<string, string>;
-  permissionSetIdsByRef: Map<string, string>;
-  permissionSetGroupIdsByRef: Map<string, string>;
-  publicGroupIdsByRef: Map<string, string>;
-  queueIdsByRef: Map<string, string>;
-  warnings: string[];
-};
+export type ExistingUser = { Id: string; IsActive?: boolean };
 
 type UserPlan = {
   planId: string;
@@ -173,7 +167,7 @@ const resolveByRoleRef = async (
   return resolved;
 };
 
-const resolveReferences = async (
+export const resolveReferences = async (
   conn: Connection,
   personas: Record<string, PersonaDefinition>,
   users: CanonicalizedUser[]
@@ -212,7 +206,7 @@ const resolveReferences = async (
   };
 };
 
-const getExistingUsers = async (
+export const getExistingUsers = async (
   conn: Connection,
   users: CanonicalizedUser[],
   defaultExternalIdField: string | undefined
@@ -269,7 +263,7 @@ const ensureWritableFields = (
   }
 };
 
-const buildTarget = (user: CanonicalizedUser, refs: ResolvedRefs, errors: string[]): JsonRecord => {
+export const buildTarget = (user: CanonicalizedUser, refs: ResolvedRefs, errors: string[]): JsonRecord => {
   const persona = user.effectivePersona;
   const target: JsonRecord = { ...user.fields, IsActive: true };
   // Profile: user profileRef > user raw ProfileId (already in target) > persona profile
@@ -295,79 +289,34 @@ const buildTarget = (user: CanonicalizedUser, refs: ResolvedRefs, errors: string
   return target;
 };
 
-export const getMembershipPlans = (
-  existingMemberships: ExistingMembership[],
-  publicTargets: string[],
-  queueTargets: string[],
-  publicMode: string | undefined,
-  queueMode: string | undefined
-): { publicAdds: string[]; publicRemoves: string[]; queueAdds: string[]; queueRemoves: string[] } => {
-  const publicCurrent = existingMemberships.filter((m) => m.GroupType === 'Regular');
-  const queueCurrent = existingMemberships.filter((m) => m.GroupType === 'Queue');
-  const compute = (
-    current: ExistingMembership[],
-    targetIds: string[],
-    modeRaw: string | undefined
-  ): { adds: string[]; removes: string[] } => {
-    const currentIds = new Set(current.map((c) => c.GroupId));
-    const target = new Set(targetIds);
-    const adds = [...target].filter((id) => !currentIds.has(id));
-    const mode = normalizeMode(modeRaw);
-    const removes = mode === 'sync' ? current.filter((c) => !target.has(c.GroupId)).map((c) => c.Id) : [];
-    return { adds, removes };
-  };
-  const publicPlan = compute(publicCurrent, publicTargets, publicMode);
-  const queuePlan = compute(queueCurrent, queueTargets, queueMode);
-  return {
-    publicAdds: publicPlan.adds,
-    publicRemoves: publicPlan.removes,
-    queueAdds: queuePlan.adds,
-    queueRemoves: queuePlan.removes,
-  };
-};
-
-const computeAssignmentPlan = (
-  current: ExistingAssignment[],
-  targetIds: string[],
-  modeRaw: string | undefined,
-  getId: (row: ExistingAssignment) => string | undefined
-): AssignmentPlan => {
-  const currentIds = new Set(current.map(getId).filter((v): v is string => Boolean(v)));
-  const target = new Set(targetIds);
-  const adds = [...target].filter((id) => !currentIds.has(id));
-  const removes =
-    normalizeMode(modeRaw) === 'sync'
-      ? current.filter((c) => getId(c) && !target.has(getId(c) as string)).map((c) => c.Id)
-      : [];
-  return { adds, removes };
-};
-
 const appendAssignmentActions = (
   actions: string[],
   dryRun: boolean,
-  permSetPlan: AssignmentPlan,
-  permSetGroupPlan: AssignmentPlan,
-  membershipPlan: { publicAdds: string[]; publicRemoves: string[]; queueAdds: string[]; queueRemoves: string[] }
+  dmlPlan: AssignmentDmlPlan
 ): void => {
   const addActionIfAny = (values: unknown[], action: string): void => {
     if (values.length > 0) actions.push(action);
   };
-  addActionIfAny(permSetPlan.adds, dryRun ? 'wouldAssignPermissionSet' : 'assignedPermissionSet');
-  addActionIfAny(permSetPlan.removes, dryRun ? 'wouldRemovePermissionSet' : 'removedPermissionSet');
-  addActionIfAny(permSetGroupPlan.adds, dryRun ? 'wouldAssignPermissionSetGroup' : 'assignedPermissionSetGroup');
-  addActionIfAny(permSetGroupPlan.removes, dryRun ? 'wouldRemovePermissionSetGroup' : 'removedPermissionSetGroup');
-  addActionIfAny(membershipPlan.publicAdds, dryRun ? 'wouldAddPublicGroupMember' : 'addedPublicGroupMember');
-  addActionIfAny(membershipPlan.publicRemoves, dryRun ? 'wouldRemovePublicGroupMember' : 'removedPublicGroupMember');
-  addActionIfAny(membershipPlan.queueAdds, dryRun ? 'wouldAddQueueMember' : 'addedQueueMember');
-  addActionIfAny(membershipPlan.queueRemoves, dryRun ? 'wouldRemoveQueueMember' : 'removedQueueMember');
+  addActionIfAny(dmlPlan.permissionSets.adds, dryRun ? 'wouldAssignPermissionSet' : 'assignedPermissionSet');
+  addActionIfAny(dmlPlan.permissionSets.removes, dryRun ? 'wouldRemovePermissionSet' : 'removedPermissionSet');
+  addActionIfAny(
+    dmlPlan.permissionSetGroups.adds,
+    dryRun ? 'wouldAssignPermissionSetGroup' : 'assignedPermissionSetGroup'
+  );
+  addActionIfAny(
+    dmlPlan.permissionSetGroups.removes,
+    dryRun ? 'wouldRemovePermissionSetGroup' : 'removedPermissionSetGroup'
+  );
+  addActionIfAny(dmlPlan.publicGroups.adds, dryRun ? 'wouldAddPublicGroupMember' : 'addedPublicGroupMember');
+  addActionIfAny(dmlPlan.publicGroups.removes, dryRun ? 'wouldRemovePublicGroupMember' : 'removedPublicGroupMember');
+  addActionIfAny(dmlPlan.queues.adds, dryRun ? 'wouldAddQueueMember' : 'addedQueueMember');
+  addActionIfAny(dmlPlan.queues.removes, dryRun ? 'wouldRemoveQueueMember' : 'removedQueueMember');
 };
 
 const performAssignmentDml = async (
   conn: Connection,
   userId: string,
-  permSetPlan: AssignmentPlan,
-  permSetGroupPlan: AssignmentPlan,
-  membershipPlan: { publicAdds: string[]; publicRemoves: string[]; queueAdds: string[]; queueRemoves: string[] },
+  dmlPlan: AssignmentDmlPlan,
   errors: string[]
 ): Promise<void> => {
   const runDml = async (op: () => Promise<SaveResult | SaveResult[]>): Promise<void> => {
@@ -375,32 +324,34 @@ const performAssignmentDml = async (
   };
   await runDml(() =>
     conn.sobject('PermissionSetAssignment').create(
-      permSetPlan.adds.map((id) => ({ AssigneeId: userId, PermissionSetId: id })),
+      dmlPlan.permissionSets.adds.map((id) => ({ AssigneeId: userId, PermissionSetId: id })),
       { allOrNone: false }
     )
   );
-  await runDml(() => conn.sobject('PermissionSetAssignment').delete(permSetPlan.removes, { allOrNone: false }));
+  await runDml(() => conn.sobject('PermissionSetAssignment').delete(dmlPlan.permissionSets.removes, { allOrNone: false }));
   await runDml(() =>
     conn.sobject('PermissionSetAssignment').create(
-      permSetGroupPlan.adds.map((id) => ({ AssigneeId: userId, PermissionSetGroupId: id })),
+      dmlPlan.permissionSetGroups.adds.map((id) => ({ AssigneeId: userId, PermissionSetGroupId: id })),
       { allOrNone: false }
     )
   );
-  await runDml(() => conn.sobject('PermissionSetAssignment').delete(permSetGroupPlan.removes, { allOrNone: false }));
+  await runDml(() =>
+    conn.sobject('PermissionSetAssignment').delete(dmlPlan.permissionSetGroups.removes, { allOrNone: false })
+  );
   await runDml(() =>
     conn.sobject('GroupMember').create(
-      membershipPlan.publicAdds.map((groupId) => ({ GroupId: groupId, UserOrGroupId: userId })),
+      dmlPlan.publicGroups.adds.map((groupId) => ({ GroupId: groupId, UserOrGroupId: userId })),
       { allOrNone: false }
     )
   );
-  await runDml(() => conn.sobject('GroupMember').delete(membershipPlan.publicRemoves, { allOrNone: false }));
+  await runDml(() => conn.sobject('GroupMember').delete(dmlPlan.publicGroups.removes, { allOrNone: false }));
   await runDml(() =>
     conn.sobject('GroupMember').create(
-      membershipPlan.queueAdds.map((groupId) => ({ GroupId: groupId, UserOrGroupId: userId })),
+      dmlPlan.queues.adds.map((groupId) => ({ GroupId: groupId, UserOrGroupId: userId })),
       { allOrNone: false }
     )
   );
-  await runDml(() => conn.sobject('GroupMember').delete(membershipPlan.queueRemoves, { allOrNone: false }));
+  await runDml(() => conn.sobject('GroupMember').delete(dmlPlan.queues.removes, { allOrNone: false }));
 };
 
 const applyAssignments = async (
@@ -412,73 +363,20 @@ const applyAssignments = async (
   actions: string[],
   errors: string[]
 ): Promise<void> => {
-  const permissionSetTargets = (persona.permissionSets ?? [])
-    .map((r) => refs.permissionSetIdsByRef.get(r))
-    .filter((v): v is string => Boolean(v));
-  const permissionSetGroupTargets = (persona.permissionSetGroups ?? [])
-    .map((r) => refs.permissionSetGroupIdsByRef.get(r))
-    .filter((v): v is string => Boolean(v));
-  const publicTargets = (persona.publicGroups ?? [])
-    .map((r) => refs.publicGroupIdsByRef.get(r))
-    .filter((v): v is string => Boolean(v));
-  const queueTargets = (persona.queues ?? [])
-    .map((r) => refs.queueIdsByRef.get(r))
-    .filter((v): v is string => Boolean(v));
-  const hasAssignmentIntent =
-    permissionSetTargets.length > 0 ||
-    permissionSetGroupTargets.length > 0 ||
-    publicTargets.length > 0 ||
-    queueTargets.length > 0 ||
-    normalizeMode(persona.permissionSetMode) === 'sync' ||
-    normalizeMode(persona.permissionSetGroupMode) === 'sync' ||
-    normalizeMode(persona.publicGroupMode) === 'sync' ||
-    normalizeMode(persona.queueMode) === 'sync';
-  if (!hasAssignmentIntent) return;
+  if (!hasAssignmentIntent(persona, refs)) return;
 
-  const loadExistingAssignmentState = async (): Promise<{
-    assignmentRows: ExistingAssignment[];
-    membershipRows: ExistingMembership[];
-  }> => {
-    if (userId === DRY_RUN_CREATE_ID) return { assignmentRows: [], membershipRows: [] };
-    const assignmentRows = (
-      await conn.query<ExistingAssignment>(
-        `SELECT Id, PermissionSetId, PermissionSetGroupId FROM PermissionSetAssignment WHERE AssigneeId = '${esc(
-          userId
-        )}'`
-      )
-    ).records;
-    const membershipRows = (
-      await conn.query<ExistingMembership & { Group: { Type: string } }>(
-        `SELECT Id, GroupId, Group.Type FROM GroupMember WHERE UserOrGroupId = '${esc(userId)}'`
-      )
-    ).records.map((r) => ({ Id: r.Id, GroupId: r.GroupId, GroupType: r.Group?.Type }));
-    return { assignmentRows, membershipRows };
-  };
-  const { assignmentRows, membershipRows } = await loadExistingAssignmentState();
+  const state =
+    userId === DRY_RUN_CREATE_ID
+      ? undefined
+      : await loadAssignmentState(conn, [userId], { permissionSetAssignments: true, groupMemberships: true });
+  const assignmentRows = state?.psaByUserId.get(userId) ?? [];
+  const membershipRows = state?.groupByUserId.get(userId) ?? [];
+  const delta = computeAssignmentDeltaFromState(persona, refs, assignmentRows, membershipRows);
+  const dmlPlan = toDmlPlan(delta, assignmentRows, membershipRows);
 
-  const permSetPlan = computeAssignmentPlan(
-    assignmentRows.filter((r) => Boolean(r.PermissionSetId)),
-    permissionSetTargets,
-    persona.permissionSetMode,
-    (r) => r.PermissionSetId
-  );
-  const permSetGroupPlan = computeAssignmentPlan(
-    assignmentRows.filter((r) => Boolean(r.PermissionSetGroupId)),
-    permissionSetGroupTargets,
-    persona.permissionSetGroupMode,
-    (r) => r.PermissionSetGroupId
-  );
-  const membershipPlan = getMembershipPlans(
-    membershipRows,
-    publicTargets,
-    queueTargets,
-    persona.publicGroupMode,
-    persona.queueMode
-  );
-
-  appendAssignmentActions(actions, dryRun, permSetPlan, permSetGroupPlan, membershipPlan);
+  appendAssignmentActions(actions, dryRun, dmlPlan);
   if (dryRun) return;
-  await performAssignmentDml(conn, userId, permSetPlan, permSetGroupPlan, membershipPlan, errors);
+  await performAssignmentDml(conn, userId, dmlPlan, errors);
 };
 
 const summarize = (results: UserResult[], globalWarningCount: number): ProvisionResult['summary'] => ({

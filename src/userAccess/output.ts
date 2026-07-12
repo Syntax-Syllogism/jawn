@@ -12,6 +12,8 @@ const baseColumns = [
 ] as const;
 
 export const fieldCsvColumns = (): string[] => [...baseColumns, 'read', 'edit'];
+export const enabledCsvColumns = (): string[] => [...baseColumns, 'enabled'];
+export const tabCsvColumns = (): string[] => [...baseColumns, 'visibility'];
 export const objectCsvColumns = (): string[] => [
   ...baseColumns,
   'read',
@@ -58,20 +60,24 @@ const paddedTable = (headers: string[], rows: string[][]): string => {
 export const renderFieldTable = (rows: UserAccessRow[]): string =>
   paddedTable(
     ['User Name', 'Username', 'Read', 'Edit', 'Via'],
-    rows.map((row) => [
-      row.userName,
-      row.username,
-      row.access.read ? 'yes' : 'no',
-      row.access.edit ? 'yes' : 'no',
-      formatVia(row.assignmentType, row.sourceName, row.viaPermissionSetName),
-    ])
+    rows.map((row) => {
+      if (row.access.kind !== 'field') throw new Error('Field table received non-field access');
+      return [
+        row.userName,
+        row.username,
+        row.access.read ? 'yes' : 'no',
+        row.access.edit ? 'yes' : 'no',
+        formatVia(row.assignmentType, row.sourceName, row.viaPermissionSetName),
+      ];
+    })
   );
 
 export const renderObjectTable = (rows: UserAccessRow[]): string =>
   paddedTable(
     ['User Name', 'Username', 'R', 'C', 'E', 'D', 'VA', 'MA', 'Via'],
     rows.map((row) => {
-      const access = row.access as Record<string, boolean>;
+      if (row.access.kind !== 'object') throw new Error('Object table received non-object access');
+      const access = row.access;
       return [
         row.userName,
         row.username,
@@ -81,6 +87,34 @@ export const renderObjectTable = (rows: UserAccessRow[]): string =>
         access.delete ? 'Y' : 'N',
         access.viewAll ? 'Y' : 'N',
         access.modifyAll ? 'Y' : 'N',
+        formatVia(row.assignmentType, row.sourceName, row.viaPermissionSetName),
+      ];
+    })
+  );
+
+export const renderEnabledTable = (rows: UserAccessRow[]): string =>
+  paddedTable(
+    ['User Name', 'Username', 'Enabled', 'Via'],
+    rows.map((row) => {
+      if (row.access.kind !== 'enabled') throw new Error('Enabled table received non-enabled access');
+      return [
+        row.userName,
+        row.username,
+        row.access.enabled ? 'yes' : 'no',
+        formatVia(row.assignmentType, row.sourceName, row.viaPermissionSetName),
+      ];
+    })
+  );
+
+export const renderTabTable = (rows: UserAccessRow[]): string =>
+  paddedTable(
+    ['User Name', 'Username', 'Visibility', 'Via'],
+    rows.map((row) => {
+      if (row.access.kind !== 'tab') throw new Error('Tab table received non-tab access');
+      return [
+        row.userName,
+        row.username,
+        row.access.visibility,
         formatVia(row.assignmentType, row.sourceName, row.viaPermissionSetName),
       ];
     })

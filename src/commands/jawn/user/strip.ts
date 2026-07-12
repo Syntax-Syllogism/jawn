@@ -15,35 +15,19 @@ import type {
   TargetError,
   TargetRequest,
 } from '../../../userLifecycle/types.js';
-import { asArray, pushErrors, readJsonOrThrow, soqlIn } from '../../../userShared/sfUtils.js';
+import {
+  loadAssignmentState,
+  type GroupMemberRow,
+  type PermissionSetAssignmentRow,
+  type PermissionSetLicenseAssignRow,
+  type UserLoginRow,
+} from '../../../userLifecycle/assignmentState.js';
+import { buildSnapshotFile, writeSnapshotFile } from '../../../userLifecycle/snapshotState.js';
+import { asArray, pushErrors, readJsonOrThrow } from '../../../userShared/sfUtils.js';
 import { confirmWithTimeout } from '../../../userShared/prompt.js';
 
 Messages.importMessagesDirectoryFromMetaUrl(import.meta.url);
 const messages = Messages.loadMessages('@syntax-syllogism/jawn', 'jawn.user.strip');
-
-type UserLoginRow = {
-  Id: string;
-  UserId: string;
-  IsFrozen: boolean;
-};
-
-type PermissionSetAssignmentRow = {
-  Id: string;
-  AssigneeId: string;
-  PermissionSetGroupId?: string;
-  PermissionSet?: { IsOwnedByProfile?: boolean };
-};
-
-type GroupMemberRow = {
-  Id: string;
-  UserOrGroupId: string;
-  Group?: { Type?: string };
-};
-
-type PermissionSetLicenseAssignRow = {
-  Id: string;
-  AssigneeId: string;
-};
 
 type StripFlags = Record<string, unknown>;
 
@@ -109,6 +93,11 @@ const targetResult = (target: { key: string; Id: string; IsActive: boolean }): L
 
 const isFlagSet = (flags: StripFlags, key: string): boolean => flags[key] === true;
 
+const getOrgProvenance = (flags: StripFlags): string | undefined => {
+  const targetOrg = flags['target-org'] as { getUsername?: () => string } | undefined;
+  return targetOrg?.getUsername?.();
+};
+
 const addAction = (result: LifecycleUserResult, key: string, count?: number, dryRun = false): void => {
   result.status = dryRun ? 'planned' : 'changed';
   result.actions.push(makeNotice(key, count));
@@ -140,67 +129,6 @@ const buildRequests = async (
     typeof flags['external-id'] === 'string' ? flags['external-id'] : undefined,
     fieldMap
   );
-};
-
-const queryRowsByUser = async <T extends { [key: string]: unknown }>(
-  conn: Pick<Connection, 'query'>,
-  soql: string,
-  keyField: string
-): Promise<Map<string, T[]>> => {
-  const rows = ((await conn.query(soql)) as unknown as { records: T[] }).records;
-  const map = new Map<string, T[]>();
-  for (const row of rows) {
-    const key = String(row[keyField] ?? '');
-    const group = map.get(key) ?? [];
-    group.push(row);
-    map.set(key, group);
-  }
-  return map;
-};
-
-const loadStripState = async (
-  conn: Connection,
-  targetIds: string[]
-): Promise<{
-  userLoginByUserId: Map<string, UserLoginRow[]>;
-  psaByUserId: Map<string, PermissionSetAssignmentRow[]>;
-  groupByUserId: Map<string, GroupMemberRow[]>;
-  pslByUserId: Map<string, PermissionSetLicenseAssignRow[]>;
-}> => {
-  if (targetIds.length === 0) {
-    return {
-      userLoginByUserId: new Map<string, UserLoginRow[]>(),
-      psaByUserId: new Map<string, PermissionSetAssignmentRow[]>(),
-      groupByUserId: new Map<string, GroupMemberRow[]>(),
-      pslByUserId: new Map<string, PermissionSetLicenseAssignRow[]>(),
-    };
-  }
-
-  const inClause = soqlIn(targetIds);
-  const [userLoginByUserId, psaByUserId, groupByUserId, pslByUserId] = await Promise.all([
-    queryRowsByUser<UserLoginRow>(
-      conn,
-      `SELECT Id, UserId, IsFrozen FROM UserLogin WHERE UserId IN (${inClause})`,
-      'UserId'
-    ),
-    queryRowsByUser<PermissionSetAssignmentRow>(
-      conn,
-      `SELECT Id, AssigneeId, PermissionSetGroupId, PermissionSet.IsOwnedByProfile FROM PermissionSetAssignment WHERE AssigneeId IN (${inClause})`,
-      'AssigneeId'
-    ),
-    queryRowsByUser<GroupMemberRow>(
-      conn,
-      `SELECT Id, UserOrGroupId, Group.Type FROM GroupMember WHERE UserOrGroupId IN (${inClause}) AND Group.Type IN ('Regular', 'Queue')`,
-      'UserOrGroupId'
-    ),
-    queryRowsByUser<PermissionSetLicenseAssignRow>(
-      conn,
-      `SELECT Id, AssigneeId FROM PermissionSetLicenseAssign WHERE AssigneeId IN (${inClause})`,
-      'AssigneeId'
-    ),
-  ]);
-
-  return { userLoginByUserId, psaByUserId, groupByUserId, pslByUserId };
 };
 
 const planFreezeState = (
@@ -472,7 +400,7 @@ const executeStrip = async (
   const { targets, errors: resolutionErrors } = await resolveTargets(conn, requests);
   const initialErrors = [...requestErrors, ...resolutionErrors];
 
-  const stateMaps = await loadStripState(
+  const stateMaps = await loadAssignmentState(
     conn,
     targets.map((target) => target.Id)
   );
@@ -495,6 +423,12 @@ const executeStrip = async (
       if (timedOut) warn(messages.getMessage('warningPromptTimeout'));
       throw new SfError(messages.getMessage('errorPromptDeclined'));
     }
+  }
+
+  if (typeof flags.snapshot === 'string' && flags.snapshot.length > 0) {
+    const snapshot = await buildSnapshotFile(conn, targets, stateMaps, getOrgProvenance(flags));
+    await writeSnapshotFile(flags.snapshot, snapshot);
+    for (const state of states) state.result.actions.push(makeNotice('snapshotWritten'));
   }
 
   if (!isFlagSet(flags, 'dry-run')) {
@@ -536,6 +470,7 @@ export default class UserStrip extends SfCommand<LifecycleResult> {
       summary: messages.getMessage('flags.keep-public-groups.summary'),
     }),
     'keep-queues': Flags.boolean({ default: false, summary: messages.getMessage('flags.keep-queues.summary') }),
+    snapshot: Flags.file({ summary: messages.getMessage('flags.snapshot.summary') }),
     'api-version': Flags.orgApiVersion({ summary: messages.getMessage('flags.api-version.summary') }),
   };
 

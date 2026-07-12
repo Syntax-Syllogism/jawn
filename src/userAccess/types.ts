@@ -1,20 +1,32 @@
 import type { Connection } from '@salesforce/core';
 
-export type AccessTargetType = 'field' | 'object';
+export type AccessTargetType = 'field' | 'object' | 'apex-class' | 'vf-page' | 'custom-permission' | 'tab';
 export type AssignmentType = 'Profile' | 'PermissionSet' | 'PermissionSetGroup';
 
 export type FieldAccess = {
+  kind: 'field';
   read: boolean;
   edit: boolean;
 };
 
 export type ObjectAccess = {
+  kind: 'object';
   read: boolean;
   create: boolean;
   edit: boolean;
   delete: boolean;
   viewAll: boolean;
   modifyAll: boolean;
+};
+
+export type EnabledAccess = {
+  kind: 'enabled';
+  enabled: boolean;
+};
+
+export type TabAccess = {
+  kind: 'tab';
+  visibility: string;
 };
 
 export type UserAccessRow = {
@@ -28,7 +40,7 @@ export type UserAccessRow = {
   sourceName: string;
   viaPermissionSetId?: string;
   viaPermissionSetName?: string;
-  access: FieldAccess | ObjectAccess;
+  access: FieldAccess | ObjectAccess | EnabledAccess | TabAccess;
 };
 
 export type UserAccessStats = {
@@ -53,6 +65,7 @@ export type ValidatedAccessTarget = {
   targetName: string;
   sobjectType?: string;
   fieldApiName?: string;
+  setupEntityId?: string;
 };
 
 export type AccessTargetResolver = {
@@ -68,6 +81,10 @@ export type AccessErrorCode =
   | 'errorFieldTargetMustBeQualified'
   | 'errorObjectNotFound'
   | 'errorFieldNotFound'
+  | 'errorApexClassNotFound'
+  | 'errorVisualforcePageNotFound'
+  | 'errorCustomPermissionNotFound'
+  | 'errorTabNotFound'
   | 'errorAccessQueryFailed';
 
 export class UserAccessError extends Error {
