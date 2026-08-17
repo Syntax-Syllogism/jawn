@@ -4,6 +4,10 @@
 
 a Salesforce CLI plugin for admin and developer workflows.
 
+IMPORTANT: 
+
+This project is no longer maintained. It has been succeeded by [apx](https://github.com/Syntax-Syllogism/apx) and [warden](https://github.com/Syntax-Syllogism/warden). 
+
 ## Install
 
 ```bash
